@@ -601,6 +601,33 @@ contains
   !---------------------------------------------------------------------!
 
   subroutine DQMC_Read_Config(cfg)
+      !
+      ! Purpose
+      ! =======
+      !    This subrotine reads in parameters from a config file.
+      !
+      ! Arguments
+      ! =========
+      !
+      type(config), intent(inout)  :: cfg          ! configuration
+      character(len=60)            :: iname
+      integer                      :: status
+
+      ! Fetch input file name from command line
+      call get_command_argument(1, iname, STATUS=status)
+      if (status > 0) then
+          call DQMC_Error("failed to retrieve input file argument", 0)
+      elseif (status == -1) then
+          call DQMC_Error("String 'iname' is too small to hold input file name, recompile me with a larger ifile!", 0)
+      end if
+
+      call DQMC_Read_ConfigFile(cfg, iname)
+
+  end subroutine DQMC_Read_Config
+
+  !---------------------------------------------------------------------!
+
+  subroutine DQMC_Read_ConfigFile(cfg, iname)
     !
     ! Purpose
     ! =======
@@ -619,17 +646,9 @@ contains
     type(Param), pointer   :: curr 
     integer, parameter     :: funit = 10
     character(len=60)      :: iname
-    integer                :: IPT, status
+    integer                :: IPT
 
     ! ... Executable ...
-
-    ! Fetch input file name from command line
-    call get_command_argument(1, iname, STATUS=status)
-    if (status > 0) then
-       call DQMC_Error("failed to retrieve input file argument", 0)
-    elseif (status == -1) then
-       call DQMC_Error("String 'iname' is too small to hold input file name, recompile me with a larger ifile!", 0)
-    end if
 
     ! Open input file
     call DQMC_open_file(iname, 'old', IPT)
@@ -741,7 +760,7 @@ contains
        end if
     end do
 
-  end subroutine DQMC_Read_Config
+  end subroutine DQMC_Read_ConfigFile
 
   !---------------------------------------------------------------------!
   ! Access functions 

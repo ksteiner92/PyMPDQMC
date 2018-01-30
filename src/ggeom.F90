@@ -1,70 +1,174 @@
+module dqmc
+    use dqmc_cfg
+    use dqmc_geom_wrap
+    use dqmc_hubbard
+    use dqmc_mpi
+    use dqmc_tdm1
+
+    implicit none
+
+contains
+
+function getmu(cfgfile) result(mu)
+    character(len=256) :: cfgfile
+    type(config) :: cfg
+    type(Hubbard) :: Hub
+    logical             :: tformat
+    character(len=slen) :: gfile
+    type(GeomWrap)      :: Gwrap
+    real :: mu, rho
+    integer             :: nBin, nIter, slice, i, j, k, avg
+    integer             :: symmetries_output_file_unit
+    real(wp)            :: randn(1)
+    real(wp)            :: tmp(2,1)
+
+    !Read input
+    call DQMC_Read_ConfigFile(cfg, cfgfile)
+
+    !Get general geometry input
+    call CFG_Get(cfg, "gfile", gfile)
+
+    call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
+    write(*,*) "read geom def"
+    if (.not.tformat) then
+        !If free format fill gwrap
+        call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
+        !Transfer info in Hub%S
+        call DQMC_Geom_Init(Gwrap,Hub%S,cfg)
+    endif
+    write(*,*) "start scf"
+
+    rho = -1.0
+    do while (abs(rho - 1.0) .GT. 1.0e-8)
+        call DQMC_Hub_Config(Hub, cfg)
+
+        if (rho >= 0.0) then
+            !Hub%mu_up(0) = (Hub%mu_up(0) - 0.1)
+            !Hub%mu_up(1) = (Hub%mu_up(1) - 0.1)
+            !Hub%mu_dn(0) = (Hub%mu_dn(0) - 0.1)
+            !Hub%mu_dn(1) = (Hub%mu_dn(1) - 0.1)
+            write(*,*) "changing mu..."
+            Hub%mu_up = Hub%mu_up - 0.1
+            Hub%mu_dn = Hub%mu_dn - 0.1
+        end if
+        rho = 0.0
+
+        if (Hub%nTry >= Gwrap%Lattice%nSites) then
+            write(*,*)
+            write(*,"('  number of lattice sites =',i5)") Gwrap%Lattice%nSites
+            write(*,"('  ntry =',i5)") Hub%nTry
+            write(*,*) " Input 'ntry' exceeds the number of lattice sites."
+            write(*,*) " Please reset 'ntry' such that it is less than"
+            write(*,*) " the number of lattice sites."
+            write(*,*) " Program stopped."
+            stop
+        end if
+
+        write(*,*) "mu_up = ", Hub%mu_up
+        write(*,*) "mu_dn = ", Hub%mu_dn
+
+        ! Warmup sweep
+        do i = 1, Hub%nWarm
+            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
+            call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+            call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+        end do
+
+        ! We divide all the measurement into nBin,
+        ! each having nPass/nBin pass.
+        nBin   = Hub%P0%nBin
+        nIter  = Hub%nPass / Hub%tausk / nBin
+        if (nIter > 0) then
+            do i = 1, nBin
+                do j = 1, nIter
+                    do k = 1, Hub%tausk
+                        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+                        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+                    enddo
+
+                    ! Fetch a random slice for measurement
+                    call ran0(1, randn, Hub%seed)
+                    slice = ceiling(randn(1)*Hub%L)
+                    write(*,'(a,3i6)') ' Measurement Sweep, bin, iter, slice : ', i, j, slice
+
+                    call DQMC_Hub_Meas(Hub, slice)
+
+                end do
+
+                ! Accumulate results for each bin
+                call DQMC_Phy0_Avg(Hub%P0)
+                !write(*,*) "rho_i = ", Hub%P0%meas(P0_DENSITY,Hub%P0%idx)
+                !rho = rho + Hub%P0%meas(P0_DENSITY,Hub%P0%idx)
+            end do
+        endif
+        tmp = Hub%P0%meas(:,Hub%P0%avg:Hub%P0%avg)
+        rho = (tmp(1, 1) + tmp(2, 1))
+        write(*,*) "rho = ", rho
+    end do
+    !mu = Hub%mu_up
+
+    call DQMC_Hub_Free(Hub)
+    call DQMC_Config_Free(cfg)
+    close(symmetries_output_file_unit)
+
+end
+
 subroutine run(cfgfile)
+    type(config) :: cfg
+    type(Hubbard) :: Hub
+    character(len=256)  :: cfgfile
+    real                :: t1, t2
+    type(GeomWrap)      :: Gwrap
+    type(tdm1)          :: tm
+    type(Gtau)          :: tau
+    character(len=slen) :: gfile
+    logical             :: tformat
+    integer             :: na, nt, nkt, nkg, i, j, k, slice, nhist, comp_tdm
+    integer             :: nBin, nIter
+    character(len=60)   :: ofile
+    integer             :: OPT
+    !integer             :: HSF_output_file_unit
+    integer             :: symmetries_output_file_unit
+    integer             :: FLD_UNIT, TDM_UNIT
+    real(wp)            :: randn(1)
 
-  use DQMC_util
-  use dqmc_cfg
-  use dqmc_geom_wrap
-  use dqmc_hubbard
-  use dqmc_mpi
-  use dqmc_tdm1
+    call cpu_time(t1)
 
-  implicit none
+    !Count the number of processors
+    call DQMC_MPI_Init(qmc_sim, PLEVEL_1)
 
-  character(len=256)  :: cfgfile
-  real                :: t1, t2
-  type(config)        :: cfg
-  type(Hubbard)       :: Hub
-  type(GeomWrap)      :: Gwrap
-  type(tdm1)          :: tm
-  type(Gtau)          :: tau
-  character(len=slen) :: gfile
-  logical             :: tformat
-  integer             :: na, nt, nkt, nkg, i, j, k, slice, nhist, comp_tdm
-  integer             :: nBin, nIter
-  character(len=60)   :: ofile  
-  integer             :: OPT, IPT
-  !integer             :: HSF_output_file_unit
-  integer             :: symmetries_output_file_unit
-  integer             :: FLD_UNIT, TDM_UNIT
-  real(wp)            :: randn(1)
+    !Read input
+    call DQMC_Read_ConfigFile(cfg, cfgfile)
 
-  call cpu_time(t1)  
+    !Get output file name header
+    call CFG_Get(cfg, "ofile", ofile)
 
-  !Count the number of processors
-  call DQMC_MPI_Init(qmc_sim, PLEVEL_1)
- 
-  !Read input
-  call DQMC_open_file(cfgfile, 'old', IPT)
-  call DQMC_Read_Def(cfg, IPT)
+    !Get general geometry input
+    call CFG_Get(cfg, "gfile", gfile)
 
-  !Get output file name header
-  call CFG_Get(cfg, "ofile", ofile)
+    !Save whether to use refinement for G used in measurements.
+    call CFG_Get(cfg, "nhist", nhist)
+    !if (nhist > 0) then
+    !   call DQMC_open_file(adjustl(trim(ofile))//'.HSF.stream','unknown', HSF_output_file_unit)
+    !endif
 
-  !Get general geometry input
-  call CFG_Get(cfg, "gfile", gfile)
-
-  !Save whether to use refinement for G used in measurements.
-  call CFG_Get(cfg, "nhist", nhist)
-  !if (nhist > 0) then
-  !   call DQMC_open_file(adjustl(trim(ofile))//'.HSF.stream','unknown', HSF_output_file_unit)
-  !endif
-
-  call DQMC_open_file(adjustl(trim(ofile))//'.geometry','unknown', symmetries_output_file_unit)
-  !Determines type of geometry file
-  call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
-  if (.not.tformat) then
+    call DQMC_open_file(adjustl(trim(ofile))//'.geometry','unknown', symmetries_output_file_unit)
+    !Determines type of geometry file
+    call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
+    if (.not.tformat) then
      !If free format fill gwrap
      call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
      !Transfer info in Hub%S
      call DQMC_Geom_Init(Gwrap,Hub%S,cfg)
-  endif
-  call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
+    endif
+    call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
 
 
-  ! Initialize the rest data
-  call DQMC_Hub_Config(Hub, cfg)
+    ! Initialize the rest data
+    call DQMC_Hub_Config(Hub, cfg)
 
-  ! Perform input parameter checks
-  if (Hub%nTry >= Gwrap%Lattice%nSites) then
+    ! Perform input parameter checks
+    if (Hub%nTry >= Gwrap%Lattice%nSites) then
     write(*,*)
     write(*,"('  number of lattice sites =',i5)") Gwrap%Lattice%nSites
     write(*,"('  ntry =',i5)") Hub%nTry
@@ -73,28 +177,28 @@ subroutine run(cfgfile)
     write(*,*) " the number of lattice sites."
     write(*,*) " Program stopped."
     stop
-  end if
+    end if
 
-  ! Initialize time dependent properties if comp_tdm > 0
-  call CFG_Get(cfg, "tdm", comp_tdm)
-  if (comp_tdm > 0) then
+    ! Initialize time dependent properties if comp_tdm > 0
+    call CFG_Get(cfg, "tdm", comp_tdm)
+    if (comp_tdm > 0) then
      call DQMC_open_file(adjustl(trim(ofile))//'.tdm.out','unknown', TDM_UNIT)
      call DQMC_Gtau_Init(Hub, tau)
-     call DQMC_TDM1_Init(Hub%L, Hub%dtau, tm, Hub%P0%nbin, Hub%S, Gwrap) 
-  endif
+     call DQMC_TDM1_Init(Hub%L, Hub%dtau, tm, Hub%P0%nbin, Hub%S, Gwrap)
+    endif
 
-  ! Warmup sweep
-  do i = 1, Hub%nWarm
+    ! Warmup sweep
+    do i = 1, Hub%nWarm
      if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
      call DQMC_Hub_Sweep(Hub, NO_MEAS0)
      call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-  end do
+    end do
 
-  ! We divide all the measurement into nBin,
-  ! each having nPass/nBin pass.
-  nBin   = Hub%P0%nBin
-  nIter  = Hub%nPass / Hub%tausk / nBin
-  if (nIter > 0) then
+    ! We divide all the measurement into nBin,
+    ! each having nPass/nBin pass.
+    nBin   = Hub%P0%nBin
+    nIter  = Hub%nPass / Hub%tausk / nBin
+    if (nIter > 0) then
      do i = 1, nBin
         do j = 1, nIter
            do k = 1, Hub%tausk
@@ -102,13 +206,13 @@ subroutine run(cfgfile)
               call DQMC_Hub_Sweep2(Hub, Hub%nTry)
            enddo
 
-           ! Fetch a random slice for measurement 
+           ! Fetch a random slice for measurement
            call ran0(1, randn, Hub%seed)
            slice = ceiling(randn(1)*Hub%L)
            write(*,'(a,3i6)') ' Measurement Sweep, bin, iter, slice : ', i, j, slice
 
            if (comp_tdm > 0) then
-              ! Compute full Green's function 
+              ! Compute full Green's function
               call DQMC_Gtau_LoadA(tau, TAU_UP, slice, Hub%G_up%sgn)
               call DQMC_Gtau_LoadA(tau, TAU_DN, slice, Hub%G_dn%sgn)
               ! Measure equal-time properties
@@ -119,7 +223,7 @@ subroutine run(cfgfile)
               call DQMC_Hub_Meas(Hub, slice)
            endif
 
-           !Write fields 
+           !Write fields
            !if (nhist > 0) call DQMC_Hub_Output_HSF(Hub, .false., slice, HSF_output_file_unit)
         end do
 
@@ -127,7 +231,7 @@ subroutine run(cfgfile)
         call DQMC_Phy0_Avg(Hub%P0)
         call DQMC_tdm1_Avg(tm)
 
-  
+
         if (Hub%meas2) then
            if(Hub%P2%diagonalize)then
              call DQMC_Phy2_Avg(Hub%P2, Hub%S)
@@ -137,10 +241,10 @@ subroutine run(cfgfile)
         end if
 
      end do
-  endif
+    endif
 
-  !Read configurations from file if no sweep was perfomed
-  if (Hub%nWarm + Hub%nPass == 0) then
+    !Read configurations from file if no sweep was perfomed
+    if (Hub%nWarm + Hub%nPass == 0) then
      Hub%nMeas = -1
      call DQMC_count_records(Hub%npass, FLD_UNIT)
      nIter = Hub%npass / nbin
@@ -155,7 +259,7 @@ subroutine run(cfgfile)
               ! Measure equal-time properties. Pass gtau in case fullg was computed.
               call DQMC_Hub_FullMeas(Hub, tau%nb, &
                  tau%A_up, tau%A_dn, tau%sgnup, tau%sgndn)
-              ! Measure time-dependent properties. Reuses fullg when possible. 
+              ! Measure time-dependent properties. Reuses fullg when possible.
               call DQMC_TDM1_Meas(tm, tau)
            else if (comp_tdm == 0) then
               call DQMC_Hub_Meas(Hub, slice)
@@ -173,48 +277,48 @@ subroutine run(cfgfile)
         end if
 
      enddo
-  endif
+    endif
 
-  !Compute average and error
-  call DQMC_Phy0_GetErr(Hub%P0)
-  call DQMC_TDM1_GetErr(tm)
-  if (Hub%meas2) then
+    !Compute average and error
+    call DQMC_Phy0_GetErr(Hub%P0)
+    call DQMC_TDM1_GetErr(tm)
+    if (Hub%meas2) then
      call DQMC_Phy2_GetErr(Hub%P2)
-  end if
+    end if
 
-  ! Prepare output file
-  call DQMC_open_file(adjustl(trim(ofile))//'.out', 'unknown', OPT)
+    ! Prepare output file
+    call DQMC_open_file(adjustl(trim(ofile))//'.out', 'unknown', OPT)
 
-  ! Print computed results
-  call DQMC_Hub_OutputParam(Hub, OPT)
-  call DQMC_Phy0_Print(Hub%P0, Hub%S, OPT)
-  call DQMC_TDM1_Print(tm, TDM_UNIT)
+    ! Print computed results
+    call DQMC_Hub_OutputParam(Hub, OPT)
+    call DQMC_Phy0_Print(Hub%P0, Hub%S, OPT)
+    call DQMC_TDM1_Print(tm, TDM_UNIT)
 
-  !Aliases for Fourier transform
-  na  =  Gwrap%lattice%natom
-  nt  =  Gwrap%lattice%ncell
-  nkt =  Gwrap%RecipLattice%nclass_k
-  nkg =  Gwrap%GammaLattice%nclass_k
- 
-  !Print info on k-points and construct clabel
-  call DQMC_Print_HeaderFT(Gwrap, OPT, .true.)
-  call DQMC_Print_HeaderFT(Gwrap, OPT, .false.)
+    !Aliases for Fourier transform
+    na  =  Gwrap%lattice%natom
+    nt  =  Gwrap%lattice%ncell
+    nkt =  Gwrap%RecipLattice%nclass_k
+    nkg =  Gwrap%GammaLattice%nclass_k
 
-  !Compute Fourier transform
-  call DQMC_phy0_GetFT(Hub%P0, Hub%S%D, Hub%S%gf_phase, Gwrap%RecipLattice%FourierC, &
+    !Print info on k-points and construct clabel
+    call DQMC_Print_HeaderFT(Gwrap, OPT, .true.)
+    call DQMC_Print_HeaderFT(Gwrap, OPT, .false.)
+
+    !Compute Fourier transform
+    call DQMC_phy0_GetFT(Hub%P0, Hub%S%D, Hub%S%gf_phase, Gwrap%RecipLattice%FourierC, &
        Gwrap%GammaLattice%FourierC, nkt, nkg, na, nt)
-  call DQMC_Phy0_GetErrFt(Hub%P0)
-  call DQMC_Phy0_PrintFT(Hub%P0, na, nkt, nkg, OPT)
+    call DQMC_Phy0_GetErrFt(Hub%P0)
+    call DQMC_Phy0_PrintFT(Hub%P0, na, nkt, nkg, OPT)
 
-  !Compute Fourier transform and error for TDM's
-  call DQMC_TDM1_GetKFT(tm)
-  call DQMC_TDM1_GetErrKFT(tm)
-  call DQMC_TDM1_PrintKFT(tm, TDM_UNIT)
+    !Compute Fourier transform and error for TDM's
+    call DQMC_TDM1_GetKFT(tm)
+    call DQMC_TDM1_GetErrKFT(tm)
+    call DQMC_TDM1_PrintKFT(tm, TDM_UNIT)
 
-  !Compute and print the self-energy
-  call DQMC_TDM1_SelfEnergy(tm, tau, TDM_UNIT)
+    !Compute and print the self-energy
+    call DQMC_TDM1_SelfEnergy(tm, tau, TDM_UNIT)
 
-  if(Hub%P2%compute)then
+    if(Hub%P2%compute)then
      if(Hub%P2%diagonalize)then
         !Obtain waves from diagonalization
         call DQMC_Phy2_GetIrrep(Hub%P2, Hub%S)
@@ -227,18 +331,19 @@ subroutine run(cfgfile)
      else
         call dqmc_phy2_print(Hub%P2, Hub%S%wlabel, OPT)
      endif
-  endif
+    endif
 
-  ! Clean up the used storage
-  call DQMC_TDM1_Free(tm)
-  call DQMC_Hub_Free(Hub)
-  call DQMC_Config_Free(cfg)
-  
-  call cpu_time(t2)
-  call DQMC_MPI_Final(qmc_sim)
-  write(STDOUT,*) "Running time:",  t2-t1, "(second)"
+    ! Clean up the used storage
+    call DQMC_TDM1_Free(tm)
+    call DQMC_Hub_Free(Hub)
+    call DQMC_Config_Free(cfg)
 
-  close(symmetries_output_file_unit)
+    call cpu_time(t2)
+    call DQMC_MPI_Final(qmc_sim)
+    write(STDOUT,*) "Running time:",  t2-t1, "(second)"
+
+    close(symmetries_output_file_unit)
 
 end subroutine run
 
+end module dqmc
