@@ -3,7 +3,8 @@ cmake_minimum_required (VERSION 3.1)
 # Project name
 project (mpdqmc)
 
-add_library(dqmc STATIC src/quest/dqmc_mpi.F90
+add_library(dqmc STATIC src/ggeom.F90
+        src/quest/dqmc_mpi.F90
         src/quest/dqmc_util.F90
         src/quest/dqmc_cfg.F90
         src/quest/dqmc_geom_param.F90
@@ -59,16 +60,19 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/src/quest)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
-# https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
 find_package(MKL)
+message(STATUS "${MKL_LIBRARIES}")
 if(MKL_FOUND)
-    # NOTE: -fdefault-integer-8 -m64  are crucial for MKL to avoid SIGSEGV at runtime!
     set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fdefault-integer-8")
     target_link_libraries(dqmc ${MKL_LIBRARIES} pthread dl)
-    #
 else()
     find_package(BLAS REQUIRED)
-    target_link_libraries(dqmc blas)
+    if (BLAS_FOUND)
+        message("MKL is not found using blas instead")
+        target_link_libraries(dqmc blas)
+    else()
+        message(STATUS "No blas library could be found.")
+    endif()
 endif()
 
 # check for OpenMP if turned on
@@ -81,15 +85,30 @@ endif()
 
 find_package(PythonInterp REQUIRED)
 
+
+add_custom_command(OUTPUT ggeom_ggeom.f90
+        COMMAND f90wrap --kind-map ../kind.map --prefix ggeom_ ../src/ggeom.F90 -m dqmc
+        DEPENDS dqmc
+        POST_BUILD)
+#[[
 add_custom_command(OUTPUT ggeom.so
         COMMAND f2py -L${CMAKE_BINARY_DIR} -lmkl_intel_lp64 -lmkl_sequential
         -lmkl_core -lpthread -ldqmc -lstdc++ -liomp5 -c
         --f90flags='-I${CMAKE_BINARY_DIR} -m64 -warn all -O3 -unroll'
-        ${CMAKE_SOURCE_DIR}/src/ggeom.F90 -m ggeom --fcompiler=intelem
-        DEPENDS dqmc
+        f90wrap_ggeom.f90 -m _ggeom --fcompiler=intelem
+        DEPENDS f90wrap_ggeom.f90
+        POST_BUILD)]]
+
+
+add_custom_command(OUTPUT dqmc.so
+        COMMAND f2py -L${CMAKE_BINARY_DIR} -lmkl_intel_lp64 -lmkl_sequential
+        -lmkl_core -lpthread -ldqmc -lstdc++ -liomp5 -c
+        --f90flags='-I${CMAKE_BINARY_DIR} -m64 -warn all -O3 -unroll'
+        ${CMAKE_BINARY_DIR}/ggeom_*.f90 -m dqmc --fcompiler=intelem
+        DEPENDS ggeom_ggeom.f90
         POST_BUILD)
 
-add_custom_target(ggeom ALL DEPENDS ggeom.so)
+add_custom_target(ggeom ALL DEPENDS dqmc.so)
 
 #include(f2py_add)
 #include("${CMAKE_SOURCE_DIR}/cmake/f2py_add.cmake")

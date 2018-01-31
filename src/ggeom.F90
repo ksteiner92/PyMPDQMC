@@ -7,20 +7,22 @@ module dqmc
 
     implicit none
 
+    type(Hubbard)       :: Hub
+    type(config)        :: cfg
+    type(GeomWrap)      :: Gwrap
+    integer             :: symmetries_output_file_unit
+    integer             :: nmu
+
 contains
 
-function getmu(cfgfile) result(mu)
-    character(len=256) :: cfgfile
-    type(config) :: cfg
-    type(Hubbard) :: Hub
-    logical             :: tformat
+function init(cfgfile) result(res)
+    character(len=256)  :: cfgfile
     character(len=slen) :: gfile
-    type(GeomWrap)      :: Gwrap
-    real :: mu, rho
-    integer             :: nBin, nIter, slice, i, j, k, avg
-    integer             :: symmetries_output_file_unit
-    real(wp)            :: randn(1)
-    real(wp)            :: tmp(2,1)
+    logical             :: tformat
+    logical             :: res
+    integer             :: mu_up_id
+
+    res = .FALSE.
 
     !Read input
     call DQMC_Read_ConfigFile(cfg, cfgfile)
@@ -29,106 +31,151 @@ function getmu(cfgfile) result(mu)
     call CFG_Get(cfg, "gfile", gfile)
 
     call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
-    write(*,*) "read geom def"
     if (.not.tformat) then
         !If free format fill gwrap
         call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
         !Transfer info in Hub%S
-        call DQMC_Geom_Init(Gwrap,Hub%S,cfg)
+        call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
     endif
-    write(*,*) "start scf"
 
-    rho = -1.0
-    do while (abs(rho - 1.0) .GT. 1.0e-8)
-        call DQMC_Hub_Config(Hub, cfg)
+    call DQMC_Hub_Config(Hub, cfg)
 
-        if (rho >= 0.0) then
-            !Hub%mu_up(0) = (Hub%mu_up(0) - 0.1)
-            !Hub%mu_up(1) = (Hub%mu_up(1) - 0.1)
-            !Hub%mu_dn(0) = (Hub%mu_dn(0) - 0.1)
-            !Hub%mu_dn(1) = (Hub%mu_dn(1) - 0.1)
-            write(*,*) "changing mu..."
-            Hub%mu_up = Hub%mu_up - 0.1
-            Hub%mu_dn = Hub%mu_dn - 0.1
-        end if
-        rho = 0.0
+    if (Hub%nTry >= Gwrap%Lattice%nSites) then
+        write(*,*)
+        write(*,"('  number of lattice sites =',i5)") Gwrap%Lattice%nSites
+        write(*,"('  ntry =',i5)") Hub%nTry
+        write(*,*) " Input 'ntry' exceeds the number of lattice sites."
+        write(*,*) " Please reset 'ntry' such that it is less than"
+        write(*,*) " the number of lattice sites."
+        write(*,*) " Program stopped."
+        stop
+    end if
 
-        if (Hub%nTry >= Gwrap%Lattice%nSites) then
-            write(*,*)
-            write(*,"('  number of lattice sites =',i5)") Gwrap%Lattice%nSites
-            write(*,"('  ntry =',i5)") Hub%nTry
-            write(*,*) " Input 'ntry' exceeds the number of lattice sites."
-            write(*,*) " Please reset 'ntry' such that it is less than"
-            write(*,*) " the number of lattice sites."
-            write(*,*) " Program stopped."
-            stop
-        end if
-
-        write(*,*) "mu_up = ", Hub%mu_up
-        write(*,*) "mu_dn = ", Hub%mu_dn
-
-        ! Warmup sweep
-        do i = 1, Hub%nWarm
-            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
-            call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-            call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-        end do
-
-        ! We divide all the measurement into nBin,
-        ! each having nPass/nBin pass.
-        nBin   = Hub%P0%nBin
-        nIter  = Hub%nPass / Hub%tausk / nBin
-        if (nIter > 0) then
-            do i = 1, nBin
-                do j = 1, nIter
-                    do k = 1, Hub%tausk
-                        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-                        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-                    enddo
-
-                    ! Fetch a random slice for measurement
-                    call ran0(1, randn, Hub%seed)
-                    slice = ceiling(randn(1)*Hub%L)
-                    write(*,'(a,3i6)') ' Measurement Sweep, bin, iter, slice : ', i, j, slice
-
-                    call DQMC_Hub_Meas(Hub, slice)
-
-                end do
-
-                ! Accumulate results for each bin
-                call DQMC_Phy0_Avg(Hub%P0)
-                !write(*,*) "rho_i = ", Hub%P0%meas(P0_DENSITY,Hub%P0%idx)
-                !rho = rho + Hub%P0%meas(P0_DENSITY,Hub%P0%idx)
-            end do
-        endif
-        tmp = Hub%P0%meas(:,Hub%P0%avg:Hub%P0%avg)
-        rho = (tmp(1, 1) + tmp(2, 1))
-        write(*,*) "rho = ", rho
-    end do
-    !mu = Hub%mu_up
-
-    call DQMC_Hub_Free(Hub)
-    call DQMC_Config_Free(cfg)
-    close(symmetries_output_file_unit)
+    mu_up_id = DQMC_Find_Param(cfg, "mu_up")
+    nmu = cfg%record(mu_up_id)%ival
+    res = .TRUE.
 
 end
 
-subroutine run(cfgfile)
-    type(config) :: cfg
-    type(Hubbard) :: Hub
-    character(len=256)  :: cfgfile
+subroutine close()
+    call DQMC_Hub_Free(Hub)
+    call DQMC_Config_Free(cfg)
+    close(symmetries_output_file_unit)
+end
+
+
+function calculateDensity(mu) result(rho)
+    real(wp)            :: rho
+    real(wp)            :: mu
+    integer             :: nBin, nIter, slice, i, j, k, avg
+    real(wp)            :: randn(1)
+    real(wp)            :: tmp(2,1)
+    real(wp)            :: progress
+    integer             :: lastprogprint
+
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) - Hub%mu_up(1:nmu)))
+    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, (Hub%mu_dn(1:nmu) - Hub%mu_dn(1:nmu)))
+    call DQMC_Hub_Config(Hub, cfg)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) + mu))
+    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, (Hub%mu_dn(1:nmu) + mu))
+    call DQMC_Hub_Config(Hub, cfg)
+
+    write(*, *) "calculate density for mu = ", mu, " ..."
+
+    rho = 0.0
+
+    ! Warmup sweep
+    write(*, *) "doing warmup ..."
+    do i = 1, Hub%nWarm
+        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+    end do
+    ! We divide all the measurement into nBin,
+    ! each having nPass/nBin pass.
+    nBin   = Hub%P0%nBin
+    nIter  = Hub%nPass / Hub%tausk / nBin
+    write(*, *) "Starting measuring ..."
+    lastprogprint = 0;
+    if (nIter > 0) then
+        do i = 1, nBin
+            do j = 1, nIter
+                do k = 1, Hub%tausk
+                    call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+                    call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+                enddo
+                ! Fetch a random slice for measurement
+                call ran0(1, randn, Hub%seed)
+                slice = ceiling(randn(1)*Hub%L)
+                call DQMC_Hub_Meas(Hub, slice)
+                progress =  real((i - 1) * nIter + j) / real(nIter * nBin) * 100.0;
+                if (int(progress) / 10 > lastprogprint) then
+                    lastprogprint = int(progress) / 10;
+                    write(*,*) (lastprogprint * 10), "%"
+                end if
+            end do
+            ! Accumulate results for each bin
+            call DQMC_Phy0_Avg(Hub%P0)
+        end do
+    endif
+
+    call DQMC_Phy0_GetErr(Hub%P0)
+    tmp = Hub%P0%meas(:,Hub%P0%avg:Hub%P0%avg)
+    !and here is our density
+    rho = (tmp(1, 1) + tmp(2, 1))
+end
+
+function RegularFalsi(mu1, mu2, rho, m, e) result(r)
+    real(wp)            :: mu1, mu2, rho, e
+    integer             :: m, i
+    !the result point
+    real(wp)            :: r, fr
+    real(wp)            :: fs, ft
+    integer             :: n
+
+    write(*,*) "starting regular falsi ..."
+
+    !starting values at endpoints of interval
+    fs = calculateDensity(mu1);
+    write(*,*) "start inveral mu = ", mu1
+    write(*,*) "start inveral rho = ", fs
+    ft = calculateDensity(mu2);
+    write(*,*) "end inveral mu = ", mu2
+    write(*,*) "end inveral rho = ", ft
+
+    do i = 1, m
+        r = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2;
+        !if (abs(mu2 - mu1) < e * abs(mu2 + mu1)) then
+        !    exit
+        !end if
+        write(*,*) "new mu = ", r
+        fr = calculateDensity(r);
+        write(*,*) "new rho = ", fr
+        if ((fr - rho) < e) then
+            exit
+        end if
+        if ((fr - rho) * (ft - rho) > 0) then
+            ! fr and ft have same sign, copy r to t
+            mu2 = r
+            ft = fr
+        else if ((fs - rho) * (fr - rho) > 0) then
+            ! fr and fs have same sign, copy r to s
+            mu1 = r
+            fs = fr
+        else
+            ! fr * f_ very small (looks like zero)
+            exit
+        endif
+    end do
+end
+
+subroutine run()
     real                :: t1, t2
-    type(GeomWrap)      :: Gwrap
     type(tdm1)          :: tm
     type(Gtau)          :: tau
-    character(len=slen) :: gfile
-    logical             :: tformat
     integer             :: na, nt, nkt, nkg, i, j, k, slice, nhist, comp_tdm
     integer             :: nBin, nIter
     character(len=60)   :: ofile
     integer             :: OPT
-    !integer             :: HSF_output_file_unit
-    integer             :: symmetries_output_file_unit
     integer             :: FLD_UNIT, TDM_UNIT
     real(wp)            :: randn(1)
 
@@ -137,14 +184,8 @@ subroutine run(cfgfile)
     !Count the number of processors
     call DQMC_MPI_Init(qmc_sim, PLEVEL_1)
 
-    !Read input
-    call DQMC_Read_ConfigFile(cfg, cfgfile)
-
     !Get output file name header
     call CFG_Get(cfg, "ofile", ofile)
-
-    !Get general geometry input
-    call CFG_Get(cfg, "gfile", gfile)
 
     !Save whether to use refinement for G used in measurements.
     call CFG_Get(cfg, "nhist", nhist)
@@ -153,31 +194,6 @@ subroutine run(cfgfile)
     !endif
 
     call DQMC_open_file(adjustl(trim(ofile))//'.geometry','unknown', symmetries_output_file_unit)
-    !Determines type of geometry file
-    call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
-    if (.not.tformat) then
-     !If free format fill gwrap
-     call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
-     !Transfer info in Hub%S
-     call DQMC_Geom_Init(Gwrap,Hub%S,cfg)
-    endif
-    call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
-
-
-    ! Initialize the rest data
-    call DQMC_Hub_Config(Hub, cfg)
-
-    ! Perform input parameter checks
-    if (Hub%nTry >= Gwrap%Lattice%nSites) then
-    write(*,*)
-    write(*,"('  number of lattice sites =',i5)") Gwrap%Lattice%nSites
-    write(*,"('  ntry =',i5)") Hub%nTry
-    write(*,*) " Input 'ntry' exceeds the number of lattice sites."
-    write(*,*) " Please reset 'ntry' such that it is less than"
-    write(*,*) " the number of lattice sites."
-    write(*,*) " Program stopped."
-    stop
-    end if
 
     ! Initialize time dependent properties if comp_tdm > 0
     call CFG_Get(cfg, "tdm", comp_tdm)
@@ -335,14 +351,10 @@ subroutine run(cfgfile)
 
     ! Clean up the used storage
     call DQMC_TDM1_Free(tm)
-    call DQMC_Hub_Free(Hub)
-    call DQMC_Config_Free(cfg)
 
     call cpu_time(t2)
     call DQMC_MPI_Final(qmc_sim)
     write(STDOUT,*) "Running time:",  t2-t1, "(second)"
-
-    close(symmetries_output_file_unit)
 
 end subroutine run
 
