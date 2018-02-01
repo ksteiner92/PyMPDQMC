@@ -196,7 +196,7 @@ nsites=lattice%nsites
 ncell=lattice%ncell
 npairbond=0
 
-if(.not.Bonds%initialized)stop'Need to initialize Bonds before calling make_pairs'
+if(.not.Bonds%initialized)stop 'Need to initialize Bonds before calling make_pairs'
 allocate(Pairs%pair_map(Bonds%ntotbond))
 
 if(move_to_record(INPUT_FIELDS(PAIRS_F),inpunit))then
