@@ -32,13 +32,12 @@ if __name__ == '__main__':
     input = ast.literal_eval(args[0])
     dqmchandle = dqmc_handler.DQMCHandler(str(input["input"]))
 
+    if ("mu" in input):
+        dqmchandle.setChemicalPotential(float(input["mu"]))
+
     dtaumax = input["dtaumax"]
     beta = input["beta"]
     dqmchandle.setBeta(beta, dtaumax)
-
-    if ("mu" in input):
-        dqmchandle.setUpChemicalPotential(float(input["mu"]))
-        dqmchandle.setDnChemicalPotential(float(input["mu"]))
 
     #if ("U" in input):
     #    dqmchandle.setU(float(input["U"]))
@@ -61,7 +60,7 @@ if __name__ == '__main__':
         mu_end = calcmu["mu_end"]
         maxit = 10
         if "maxit" in calcmu: maxit = calcmu["maxit"]
-        epsilon = 1e-8
+        epsilon = 1e-6
         if "epsilon" in calcmu: calcmu["epsilon"]
         print "Find chemical potential for rho = ", rho, " ..."
         mu = dqmchandle.calcPotentialForDensity(mu_start, mu_end, rho, maxit, epsilon)

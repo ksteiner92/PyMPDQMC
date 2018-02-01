@@ -48,7 +48,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 enable_language(Fortran)
 
 if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -std=legacy -m64 -funroll-loops -Wall -O3 -fPIC")
+    set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -m64 -funroll-loops -Wall -O3 -fPIC")
     set (F2PY_COMPILER gnu95)
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
     set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -m64 -warn all -O3 -unroll -fPIC")
@@ -70,8 +70,8 @@ if("${MKL_LIBRARIES}" STREQUAL "")
 else()
     message(STATUS "Found required mkl libraries")
     set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fdefault-integer-8")
-    #target_link_libraries(dqmc ${MKL_LIBRARIES} pthread dl)
-    target_link_libraries(dqmc mkl_intel_lp64 mkl_sequential mkl_core stdc++ pthread dl)
+    target_link_libraries(dqmc ${MKL_LIBRARIES} pthread dl)
+    #target_link_libraries(dqmc mkl_intel_lp64 mkl_sequential mkl_core stdc++ pthread dl)
 endif()
 
 find_package(OpenMP)
@@ -102,19 +102,19 @@ add_custom_command(OUTPUT ${F2PY_PREFIX}ggeom.f90
         DEPENDS dqmc
         POST_BUILD)
 
-add_custom_command(OUTPUT dqmc.so
-        COMMAND f2py -L${CMAKE_BINARY_DIR} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldqmc -lstdc++  -c
-        --f90flags='-I${CMAKE_BINARY_DIR} ${CMAKE_Fortran_FLAGS}'
-        ${CMAKE_BINARY_DIR}/${F2PY_PREFIX}*.f90 -m ${F2PY_MODULE} --fcompiler=${F2PY_COMPILER}
-        DEPENDS ${F2PY_PREFIX}ggeom.f90
-        POST_BUILD)
-
 #[[add_custom_command(OUTPUT dqmc.so
-        COMMAND f2py -L${CMAKE_BINARY_DIR} ${MKL_LIBRARIES} -ldqmc -lstdc++  -c
+        COMMAND f2py -L${CMAKE_BINARY_DIR} -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldqmc -lstdc++  -c
         --f90flags='-I${CMAKE_BINARY_DIR} ${CMAKE_Fortran_FLAGS}'
         ${CMAKE_BINARY_DIR}/${F2PY_PREFIX}*.f90 -m ${F2PY_MODULE} --fcompiler=${F2PY_COMPILER}
         DEPENDS ${F2PY_PREFIX}ggeom.f90
         POST_BUILD)]]
+
+add_custom_command(OUTPUT dqmc.so
+        COMMAND f2py -L${CMAKE_BINARY_DIR} ${MKL_LIBRARIES} -ldqmc -lstdc++  -c
+        --f90flags='-I${CMAKE_BINARY_DIR} ${CMAKE_Fortran_FLAGS}'
+        ${CMAKE_BINARY_DIR}/${F2PY_PREFIX}*.f90 -m ${F2PY_MODULE} --fcompiler=${F2PY_COMPILER}
+        DEPENDS ${F2PY_PREFIX}ggeom.f90
+        POST_BUILD)
 
 add_custom_target(ggeom ALL DEPENDS dqmc.so)
 

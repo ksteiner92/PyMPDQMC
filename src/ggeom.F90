@@ -96,19 +96,29 @@ subroutine setParameterPI(name, value, n)
     call DQMC_Hub_Config(Hub, cfg)
 end
 
+subroutine setUniformMu(mu)
+    real(wp), intent(in)         :: mu
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) - Hub%mu_up(1:nmu)))
+    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, (Hub%mu_dn(1:nmu) - Hub%mu_dn(1:nmu)))
+    call DQMC_Hub_Config(Hub, cfg)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) + mu))
+    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, (Hub%mu_dn(1:nmu) + mu))
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
 subroutine setUniformMu_up(mu_up)
     real(wp), intent(in)         :: mu_up
-    real(wp)                     :: mu_up_tmp(Hub%S%nGroup)
-    mu_up_tmp(1:Hub%S%nGroup) = mu_up
-    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, mu_up_tmp)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) - Hub%mu_up(1:nmu)))
+    call DQMC_Hub_Config(Hub, cfg)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_up(1:nmu) + mu_up))
     call DQMC_Hub_Config(Hub, cfg)
 end
 
 subroutine setUniformMu_dn(mu_dn)
     real(wp), intent(in)         :: mu_dn
-    real(wp)                     :: mu_dn_tmp(Hub%S%nGroup)
-    mu_dn_tmp(1:Hub%S%nGroup) = mu_dn
-    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, mu_dn_tmp)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_dn(1:nmu) - Hub%mu_dn(1:nmu)))
+    call DQMC_Hub_Config(Hub, cfg)
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, (Hub%mu_dn(1:nmu) + mu_dn))
     call DQMC_Hub_Config(Hub, cfg)
 end
 

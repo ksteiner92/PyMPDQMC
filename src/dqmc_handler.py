@@ -97,6 +97,9 @@ class DQMCHandler:
         dqmc.ggeom_setparameterr("dtau", dtau)
         dqmc.ggeom_setparameteri("L", L)
 
+    def setChemicalPotential(self, mu):
+        dqmc.ggeom_setuniformmu(mu)
+
     def setUpChemicalPotential(self, mu):
         dqmc.ggeom_setuniformmu_up(mu)
 
