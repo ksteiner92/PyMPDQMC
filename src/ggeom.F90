@@ -13,7 +13,127 @@ module dqmc
     integer             :: symmetries_output_file_unit
     integer             :: nmu
 
+    interface setParameter
+        module procedure setParameterI, setParameterR
+        module procedure setParameterS, setParameterPR
+        module procedure setParameterPI
+    end interface
+
+    !interface getParameter
+    !    module procedure getParameterI, getParameterR
+    !    module procedure getParameterS, getParameterPR
+    !    module procedure getParameterPI
+    !end interface
+
 contains
+
+function getParameterI(name) result(value)
+    character(len=*) :: name
+    integer       :: value
+    call CFG_GET(cfg, name, value)
+end
+
+function getParameterR(name) result(value)
+    character(len=*) :: name
+    real(wp)     :: value
+    call CFG_GET(cfg, name, value)
+end
+
+subroutine getParameterS(name, value)
+    character(len=slen), intent(in)     :: name
+    character(len=slen), intent(inout) :: value
+    call CFG_GET(cfg, name, value)
+end
+
+function getParameterPR(name, n) result(value)
+    character(len=*) :: name
+    real(wp), pointer :: value(:)
+    integer         :: n
+    call CFG_GET(cfg, name, n, value)
+end
+
+function getParameterPI(name, n) result(value)
+    character(len=*) :: name
+    integer, pointer :: value(:)
+    integer          :: n
+    call CFG_GET(cfg, name, n, value)
+end
+
+subroutine setParameterI(name, value)
+    character(len=*), intent(in) :: name
+    integer, intent(in)          :: value
+    call CFG_Set(cfg, name, value)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setParameterR(name, value)
+    character(len=*), intent(in) :: name
+    real(wp), intent(in)         :: value
+    call CFG_Set(cfg, name, value)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setParameterS(name, value)
+    character(*), intent(in)     :: name
+    character(*), intent(in)     :: value
+    call CFG_Set(cfg, name, value)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setParameterPR(name, value, n)
+    character(len=*), intent(in) :: name
+    real(wp), intent(in)         :: value(n)
+    integer, intent(in)          :: n
+    call CFG_Set(cfg, name, n, value)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setParameterPI(name, value, n)
+    character(len=*), intent(in) :: name
+    integer, intent(in)          :: value(n)
+    integer, intent(in)          :: n
+    call CFG_Set(cfg, name, n, value)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setUniformMu_up(mu_up)
+    real(wp), intent(in)         :: mu_up
+    real(wp)                     :: mu_up_tmp(Hub%S%nGroup)
+    mu_up_tmp(1:Hub%S%nGroup) = mu_up
+    call CFG_Set(cfg, "mu_up", Hub%S%nGroup, mu_up_tmp)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setUniformMu_dn(mu_dn)
+    real(wp), intent(in)         :: mu_dn
+    real(wp)                     :: mu_dn_tmp(Hub%S%nGroup)
+    mu_dn_tmp(1:Hub%S%nGroup) = mu_dn
+    call CFG_Set(cfg, "mu_dn", Hub%S%nGroup, mu_dn_tmp)
+    call DQMC_Hub_Config(Hub, cfg)
+end
+
+subroutine setUniformU(U)
+    real(wp), intent(in)         :: U
+    Hub%U = U
+end
+
+subroutine setGeomFile(gfile)
+    character(len=slen) :: gfile
+    logical             :: tformat
+
+    !Get general geometry input
+    call CFG_Get(cfg, "gfile", gfile)
+
+    call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
+    if (.not.tformat) then
+        !If free format fill gwrap
+        call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
+        !Transfer info in Hub%S
+        call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
+    endif
+
+    call DQMC_Hub_Config(Hub, cfg)
+end
 
 function init(cfgfile) result(res)
     character(len=256)  :: cfgfile
@@ -30,15 +150,8 @@ function init(cfgfile) result(res)
     !Get general geometry input
     call CFG_Get(cfg, "gfile", gfile)
 
-    call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
-    if (.not.tformat) then
-        !If free format fill gwrap
-        call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
-        !Transfer info in Hub%S
-        call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
-    endif
-
-    call DQMC_Hub_Config(Hub, cfg)
+    ! set geom file
+    call setGeomFile(gfile)
 
     if (Hub%nTry >= Gwrap%Lattice%nSites) then
         write(*,*)
@@ -122,50 +235,6 @@ function calculateDensity(mu) result(rho)
     tmp = Hub%P0%meas(:,Hub%P0%avg:Hub%P0%avg)
     !and here is our density
     rho = (tmp(1, 1) + tmp(2, 1))
-end
-
-function RegularFalsi(mu1, mu2, rho, m, e) result(r)
-    real(wp)            :: mu1, mu2, rho, e
-    integer             :: m, i
-    !the result point
-    real(wp)            :: r, fr
-    real(wp)            :: fs, ft
-    integer             :: n
-
-    write(*,*) "starting regular falsi ..."
-
-    !starting values at endpoints of interval
-    fs = calculateDensity(mu1);
-    write(*,*) "start inveral mu = ", mu1
-    write(*,*) "start inveral rho = ", fs
-    ft = calculateDensity(mu2);
-    write(*,*) "end inveral mu = ", mu2
-    write(*,*) "end inveral rho = ", ft
-
-    do i = 1, m
-        r = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2;
-        !if (abs(mu2 - mu1) < e * abs(mu2 + mu1)) then
-        !    exit
-        !end if
-        write(*,*) "new mu = ", r
-        fr = calculateDensity(r);
-        write(*,*) "new rho = ", fr
-        if ((fr - rho) < e) then
-            exit
-        end if
-        if ((fr - rho) * (ft - rho) > 0) then
-            ! fr and ft have same sign, copy r to t
-            mu2 = r
-            ft = fr
-        else if ((fs - rho) * (fr - rho) > 0) then
-            ! fr and fs have same sign, copy r to s
-            mu1 = r
-            fs = fr
-        else
-            ! fr * f_ very small (looks like zero)
-            exit
-        endif
-    end do
 end
 
 subroutine run()
