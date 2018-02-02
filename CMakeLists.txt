@@ -95,22 +95,16 @@ execute_process(
 
 message(STATUS "${PYTHON_SITE}")
 
-#-L$(MKLPATH) -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread
+set(F2PY_EXEC f2py)
+set(F90WRAP_EXEC f90wrap)
 
 add_custom_command(OUTPUT ${F2PY_PREFIX}ggeom.f90
-        COMMAND f90wrap --kind-map ${CMAKE_SOURCE_DIR}/kind.map --prefix ${F2PY_PREFIX} -m ${F2PY_MODULE} ${CMAKE_SOURCE_DIR}/src/ggeom.F90
+        COMMAND ${F90WRAP_EXEC} --kind-map ${CMAKE_SOURCE_DIR}/kind.map --prefix ${F2PY_PREFIX} -m ${F2PY_MODULE} ${CMAKE_SOURCE_DIR}/src/ggeom.F90
         DEPENDS dqmc
         POST_BUILD)
 
-#[[add_custom_command(OUTPUT dqmc.so
-        COMMAND f2py -L${CMAKE_BINARY_DIR} -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldqmc -lstdc++  -c
-        --f90flags='-I${CMAKE_BINARY_DIR} ${CMAKE_Fortran_FLAGS}'
-        ${CMAKE_BINARY_DIR}/${F2PY_PREFIX}*.f90 -m ${F2PY_MODULE} --fcompiler=${F2PY_COMPILER}
-        DEPENDS ${F2PY_PREFIX}ggeom.f90
-        POST_BUILD)]]
-
 add_custom_command(OUTPUT dqmc.so
-        COMMAND f2py -L${CMAKE_BINARY_DIR} ${MKL_LIBRARIES} -ldqmc -lstdc++  -c
+        COMMAND ${F2PY_EXEC} -L${CMAKE_BINARY_DIR} ${MKL_LIBRARIES} -ldqmc -lstdc++  -c
         --f90flags='-I${CMAKE_BINARY_DIR} ${CMAKE_Fortran_FLAGS}'
         ${CMAKE_BINARY_DIR}/${F2PY_PREFIX}*.f90 -m ${F2PY_MODULE} --fcompiler=${F2PY_COMPILER}
         DEPENDS ${F2PY_PREFIX}ggeom.f90
