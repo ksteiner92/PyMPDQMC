@@ -3,6 +3,8 @@ import sys
 from dqmc import dqmc_handler
 import optparse
 import ast
+import numpy
+
 """
     Input:
         beta*: float

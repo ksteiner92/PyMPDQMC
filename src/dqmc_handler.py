@@ -21,17 +21,17 @@ class DQMCHandler:
     def calcPotentialForDensity(self, mu1, mu2, rho, maxit, epsilon = 1e-10):
         print "Starting regular falsi ..."
         print "Calculate start mu = ", mu1, " ..."
-        fs = calculateDensity(mu1)
+        fs = calculateDensity(float(mu1))
         print "Start rho = ", fs
         print "Calculate end mu = ", mu2, " ..."
-        ft = calculateDensity(mu2)
+        ft = calculateDensity(float(mu2))
         print "End rho = ", ft
 
         mu = 0.0
         for i in range(1, maxit):
             mu = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2
             print "new mu = ", mu
-            fr = calculateDensity(mu)
+            fr = calculateDensity(float(mu))
             print "rho = ", fr
             if (abs(fr - rho) < epsilon):
                 return mu

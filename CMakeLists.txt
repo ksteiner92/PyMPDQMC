@@ -110,7 +110,13 @@ add_custom_command(OUTPUT dqmc.so
         DEPENDS ${F2PY_PREFIX}ggeom.f90
         POST_BUILD)
 
+#add_custom_command(OUTPUT dist/task/task
+#        COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py
+#        DEPENDS dqmc.so
+#        POST_BUILD)
+
 add_custom_target(ggeom ALL DEPENDS dqmc.so)
+
 
 install(FILES ${CMAKE_BINARY_DIR}/dqmc.so
         DESTINATION ${PYTHON_SITE}/dqmc)
@@ -132,6 +138,8 @@ install(FILES ${CMAKE_SOURCE_DIR}/src/extract.py
 
 install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py
         DESTINATION ${PYTHON_SITE}/dqmc)
+
+#install(COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py)
 #include(f2py_add)
 #include("${CMAKE_SOURCE_DIR}/cmake/f2py_add.cmake")
 #F2PY_ADD(MODULE ggeom SRC "${CMAKE_SOURCE_DIR}/src/ggeom.F90" EXTERNAL_LIBS -ldqmc ${CMAKE_SOURCE_DIR}/cmake-build-debug)
