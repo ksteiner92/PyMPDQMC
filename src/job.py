@@ -3,7 +3,6 @@ import sys
 import optparse
 import ast
 import subprocess
-import json
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage = "%prog <input>")
@@ -14,19 +13,21 @@ if __name__ == '__main__':
         sys.exit("Not enough arguments given")
 
     input = ast.literal_eval(args[0])
-    #mpdqmc = MPDQMC(str(input["input"]), int(input["np"]))
-    #params = input["params"]
-    #dtaumax = params["dtaumax"]
 
     p = []
     prefix = str(input["prefix"])
     logdir = ""
     if ("logdir" in taskargs):
         logdir = os.path.abspath(taskargs["logdir"])
-    for beta in input["beta"]:
+    betas = input["beta"]
+    if (len(betas) == 0):
+        sys.exit(("No beta values given")
+    numdeci = max(str(betas[0])[::-1].find('.'), str(betas[len(betas) - 1])[::-1].find('.'))
+    for beta in betas:
         taskargs = input
         taskargs["beta"] = beta
-        name = prefix + str(beta)
+        betastr = ("b{0:." + str(numdeci) + "f}").format(beta)
+        name = prefix + betastr
         params = {}
         ofile = {}
         ofile["value"] = name
@@ -36,4 +37,4 @@ if __name__ == '__main__':
         params["ofile"] = ofile
         taskargs["params"] = params
         with open(os.path.abspath(logfile), "w") as log:
-            subprocess.Popen(['python', 'task.py', str(taskargs)], stdout=log)
+            subprocess.Popen(['task.py', str(taskargs)], stdout=log)

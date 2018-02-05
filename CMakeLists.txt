@@ -121,19 +121,7 @@ add_custom_target(ggeom ALL DEPENDS dqmc.so)
 install(FILES ${CMAKE_BINARY_DIR}/dqmc.so
         DESTINATION ${PYTHON_SITE}/dqmc)
 
-install(FILES ${CMAKE_SOURCE_DIR}/src/task.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
-install(FILES ${CMAKE_SOURCE_DIR}/src/job.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
 install(FILES ${CMAKE_SOURCE_DIR}/src/dqmc_handler.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
-install(FILES ${CMAKE_SOURCE_DIR}/src/mpdqmc.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
-install(FILES ${CMAKE_SOURCE_DIR}/src/extract.py
         DESTINATION ${PYTHON_SITE}/dqmc)
 
 install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py

@@ -46,7 +46,6 @@ if __name__ == '__main__':
         tasks = []
         for j in range(0, ntasks):
             tasks.append(getNextBeta(n))
-            print "n: ", n, "node ", i, ": task ", j, " beta: ", getNextBeta(n)
             n += 1
         jobs.append(tasks)
     rest = nsteps % ntasks
@@ -54,7 +53,6 @@ if __name__ == '__main__':
         tasks = []
         for i in range(0, rest):
             tasks.append(getNextBeta(n))
-            print "n: ", n, "node ", i, " beta: ", getNextBeta(n)
             n += 1
         jobs.append(tasks)
 
@@ -92,7 +90,7 @@ if __name__ == '__main__':
     jobargs["prefix"] = prefix
     if ("logdir" in conf):
         logdir = os.path.abspath(conf["logdir"])
-        if os.path.exists(logdir):
+        if not os.path.exists(logdir):
             os.makedirs(logdir)
         jobargs["logdir"] = logdir
 
@@ -103,5 +101,5 @@ if __name__ == '__main__':
         taskargs = jobargs
         taskargs["beta"] = jobs[i]
         name = prefix, str(jobs[0])
-        print taskargs
-        subprocess.Popen(["qsub", "-N", name, "job.py", str(taskargs)])
+        #subprocess.Popen(['python', 'job.py', str(taskargs)])
+        subprocess.Popen(['qsub', '-N', str(name), 'job.py', str(taskargs)])
