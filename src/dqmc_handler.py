@@ -87,12 +87,14 @@ class DQMCHandler:
 
     def setBeta(self, beta, dtaumax):
         L = int(beta / dtaumax)
-        if (abs(float(L) - (beta / dtaumax)) > 1e-4):
-            L = L + 1
-        elif (L == 0):
+        if (L == 0):
             L = 10
-            #dqmc.ggeom_setparameteri("north", 5)
+            dqmc.ggeom_setparameteri("north", 5)
+        elif (abs(float(L) - (beta / dtaumax)) > 1e-4):
+            L = L + 1
 
+        north = dqmc.ggeom_getparameteri("north")
+        print "beta: ", str(beta), " north: ", north
         dtau = beta / float(L)
         dqmc.ggeom_setparameterr("dtau", dtau)
         dqmc.ggeom_setparameteri("L", L)

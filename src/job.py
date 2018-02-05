@@ -18,15 +18,22 @@ if __name__ == '__main__':
     #params = input["params"]
     #dtaumax = params["dtaumax"]
 
+    p = []
+    prefix = str(input["prefix"])
+    logdir = ""
+    if ("logdir" in taskargs):
+        logdir = os.path.abspath(taskargs["logdir"])
     for beta in input["beta"]:
         taskargs = input
         taskargs["beta"] = beta
-        print taskargs
-        subprocess.Popen(['python', '/home/klaus/dev/mpdqmc/src/task.py', str(taskargs)])
-        #mpdqmc.setBeta(beta, dtaumax)
-
-
-    #mpdqmc.setParameter("dtau", 0.1)
-    #val = 0.0
-    #print "dtau: ", mpdqmc.getParameter("dtau", val)
-    #mu = mpdqmc.calcPotentialForDensity(-1, 1, 1, 10, 1e-6)
+        name = prefix + str(beta)
+        params = {}
+        ofile = {}
+        ofile["value"] = name
+        logfile = name + ".log"
+        logfile = os.path.append(logdir, logfile)
+        ofile["type"] = "str"
+        params["ofile"] = ofile
+        taskargs["params"] = params
+        with open(os.path.abspath(logfile), "w") as log:
+            subprocess.Popen(['python', 'task.py', str(taskargs)], stdout=log)

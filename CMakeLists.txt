@@ -139,6 +139,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/src/extract.py
 install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py
         DESTINATION ${PYTHON_SITE}/dqmc)
 
+#install(CODE "execute_process(COMMAND pyinstaller ${PYTHON_SITE}/dqmc/)")
 #install(COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py)
 #include(f2py_add)
 #include("${CMAKE_SOURCE_DIR}/cmake/f2py_add.cmake")

@@ -2,6 +2,7 @@ import optparse
 import yaml
 import numpy as np
 import subprocess
+import os
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage = "%prog <input>")
@@ -88,6 +89,13 @@ if __name__ == '__main__':
     jobargs["input"] = input
     dtaumax = 0.1
     jobargs["dtaumax"] = dtaumax
+    jobargs["prefix"] = prefix
+    if ("logdir" in conf):
+        logdir = os.path.abspath(conf["logdir"])
+        if os.path.exists(logdir):
+            os.makedirs(logdir)
+        jobargs["logdir"] = logdir
+
     if ("calcmu" in conf):
         jobargs["calcmu"] = conf["calcmu"]
 
@@ -96,11 +104,4 @@ if __name__ == '__main__':
         taskargs["beta"] = jobs[i]
         name = prefix, str(jobs[0])
         print taskargs
-        subprocess.Popen(['python', '/home/klaus/dev/mpdqmc/src/job.py', str(taskargs)])
-        #subprocess.Popen(['qsub', "-N ", name, 'python /home/klaus/dev/mpdqmc/src/job.py', str(taskargs)])
-        #subprocess.Popen(["python", "/home/klaus/dev/mpdqmc/src/job.py", str(taskargs)])
-        #params = {}
-        #params["ofile"] = prefix, str
-        #cmd = "qsub -v casedir='%s',input='%s', -N 'dqmc-%s' %s"  % (casedir, f, case, args[2])
-        #print cmd
-        #os.system(cmd)
+        subprocess.Popen(["qsub", "-N", name, "job.py", str(taskargs)])

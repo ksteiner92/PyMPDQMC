@@ -5,6 +5,11 @@ import optparse
 import ast
 import numpy
 
+def setParam(dqmchandle, name, v):
+    t = v["type"]
+    val = v["value"]
+    dqmchandle.setParameter(name, val, t)
+
 """
     Input:
         beta*: float
@@ -47,9 +52,7 @@ if __name__ == '__main__':
     if ("params" in input):
         params = input["params"]
         for name, v in params.items():
-            t = v["type"]
-            val = v["value"]
-            dqmchandle.setParameter(name, val, t)
+            setParam(dqmchandle, name, v)
 
     if ("gfile" in input):
         gfile = input["gfile"]
@@ -64,6 +67,10 @@ if __name__ == '__main__':
         if "maxit" in calcmu: maxit = calcmu["maxit"]
         epsilon = 1e-6
         if "epsilon" in calcmu: calcmu["epsilon"]
+        if ("params" in input):
+            params = calcmu["params"]
+            for name, v in params.items():
+                setParam(dqmchandle, name, v)
         print "Find chemical potential for rho = ", rho, " ..."
         mu = dqmchandle.calcPotentialForDensity(mu_start, mu_end, rho, maxit, epsilon)
         print "Found chemical potential for rho = ", rho, " to be ", mu

@@ -268,6 +268,7 @@ subroutine run()
 
     !Save whether to use refinement for G used in measurements.
     call CFG_Get(cfg, "nhist", nhist)
+
     !if (nhist > 0) then
     !   call DQMC_open_file(adjustl(trim(ofile))//'.HSF.stream','unknown', HSF_output_file_unit)
     !endif
