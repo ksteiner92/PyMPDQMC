@@ -1,3 +1,4 @@
+#!/home/ksteiner/opt/bin/python
 import optparse
 import yaml
 import numpy as np
@@ -96,10 +97,17 @@ if __name__ == '__main__':
 
     if ("calcmu" in conf):
         jobargs["calcmu"] = conf["calcmu"]
-
+    numdeci = max(str(startbeta)[::-1].find('.'), str(endbeta)[::-1].find('.'))	
     for i in range(0, len(jobs)):
         taskargs = jobargs
-        taskargs["beta"] = jobs[i]
-        name = prefix, str(jobs[0])
-        #subprocess.Popen(['python', 'job.py', str(taskargs)])
-        subprocess.Popen(['qsub', '-N', str(name), 'job.py', str(taskargs)])
+        for beta in jobs[i]:
+		taskargs["beta"] = beta
+	        betastr = ("b{0:." + str(numdeci) + "f}").format(beta)
+        	name = prefix + str(betastr)
+		params = {}
+		ofile = {}
+        	ofile["value"] = name
+        	ofile["type"] = "str"
+        	params["ofile"] = ofile
+		taskargs["params"] = params
+        	subprocess.Popen(['qsub', '-N', str(name), '-v', "casedir='" + os.getcwd() + "',arg=\"" + str(taskargs) + "\",beta=\"" + betastr + "\"", 'sub.qsub'])

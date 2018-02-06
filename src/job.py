@@ -1,3 +1,4 @@
+#!/home/ksteiner/opt/bin/python
 import os
 import sys
 import optparse
@@ -17,11 +18,11 @@ if __name__ == '__main__':
     p = []
     prefix = str(input["prefix"])
     logdir = ""
-    if ("logdir" in taskargs):
-        logdir = os.path.abspath(taskargs["logdir"])
+    if ("logdir" in input):
+        logdir = os.path.abspath(input["logdir"])
     betas = input["beta"]
     if (len(betas) == 0):
-        sys.exit(("No beta values given")
+        sys.exit("No beta values given")
     numdeci = max(str(betas[0])[::-1].find('.'), str(betas[len(betas) - 1])[::-1].find('.'))
     for beta in betas:
         taskargs = input
@@ -32,7 +33,7 @@ if __name__ == '__main__':
         ofile = {}
         ofile["value"] = name
         logfile = name + ".log"
-        logfile = os.path.append(logdir, logfile)
+        logfile = os.path.join(logdir, logfile)
         ofile["type"] = "str"
         params["ofile"] = ofile
         taskargs["params"] = params

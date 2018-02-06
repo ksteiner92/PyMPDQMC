@@ -1,3 +1,4 @@
+#!/home/ksteiner/opt/bin/python
 import os
 import sys
 from dqmc import dqmc_handler
@@ -58,6 +59,7 @@ if __name__ == '__main__':
         gfile = input["gfile"]
         dqmchandle.setGeomFile(gfile)
 
+    restoreparams = {}
     if ("calcmu" in input):
         calcmu = input["calcmu"]
         rho = calcmu["rho"]
@@ -70,9 +72,18 @@ if __name__ == '__main__':
         if ("params" in input):
             params = calcmu["params"]
             for name, v in params.items():
-                setParam(dqmchandle, name, v)
+                restorep = {}
+                restorep["value"] = str(dqmchandle.getParameter(name, v["type"]))
+                restorep["type"] = v["type"]
+		restoreparams[name] = restorep
+		setParam(dqmchandle, name, v)
         print "Find chemical potential for rho = ", rho, " ..."
         mu = dqmchandle.calcPotentialForDensity(mu_start, mu_end, rho, maxit, epsilon)
         print "Found chemical potential for rho = ", rho, " to be ", mu
+    if restoreparams:
+        print "Restoring parameters for simulation ..."
+        for name, v in restoreparams.items():
+            print " - restoring '", name, ", = ", v["value"]
+            setParam(dqmchandle, name, v)
     print "Start dqmc ..."
     dqmchandle.run()
