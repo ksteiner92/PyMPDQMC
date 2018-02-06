@@ -5,11 +5,41 @@ from dqmc import dqmc_handler
 import optparse
 import ast
 import numpy
+import subprocess
 
 def setParam(dqmchandle, name, v):
     t = v["type"]
     val = v["value"]
     dqmchandle.setParameter(name, val, t)
+
+
+def calcPotentialForDensity(dqmchandle, mu1, mu2, rho, maxit, epsilon = 1e-10):
+    print "Starting regular falsi ..."
+    #log = open()
+    print "Calculate start mu = ", mu1, " ..."
+    fs = dqmchandle.calculateDensity(float(mu1))
+    print "Start rho = ", fs
+    print "Calculate end mu = ", mu2, " ..."
+    ft = dqmchandle.calculateDensity(float(mu2))
+    print "End rho = ", ft
+
+    mu = 0.0
+    for i in range(1, maxit):
+        mu = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2
+        print "new mu = ", mu
+        fr = dqmchandle.calculateDensity(float(mu))
+        print "rho = ", fr
+        if (abs(fr - rho) < epsilon):
+            return mu
+        if ((fr - rho) * (ft - rho) > 0):
+            mu2 = mu
+            ft = fr
+        elif ((fs - rho) * (fr - rho) > 0):
+            mu1 = mu
+            fs = fr
+        else:
+            return mu
+    return mu
 
 """
     Input:
@@ -47,9 +77,6 @@ if __name__ == '__main__':
     beta = input["beta"]
     dqmchandle.setBeta(beta, dtaumax)
 
-    #if ("U" in input):
-    #    dqmchandle.setU(float(input["U"]))
-
     if ("params" in input):
         params = input["params"]
         for name, v in params.items():
@@ -69,21 +96,26 @@ if __name__ == '__main__':
         if "maxit" in calcmu: maxit = calcmu["maxit"]
         epsilon = 1e-6
         if "epsilon" in calcmu: calcmu["epsilon"]
-        if ("params" in input):
+        if ("params" in calcmu):
             params = calcmu["params"]
             for name, v in params.items():
                 restorep = {}
                 restorep["value"] = str(dqmchandle.getParameter(name, v["type"]))
                 restorep["type"] = v["type"]
-		restoreparams[name] = restorep
-		setParam(dqmchandle, name, v)
+                restoreparams[name] = restorep
+                setParam(dqmchandle, name, v)
         print "Find chemical potential for rho = ", rho, " ..."
-        mu = dqmchandle.calcPotentialForDensity(mu_start, mu_end, rho, maxit, epsilon)
+        mu = calcPotentialForDensity(dqmchandle, mu_start, mu_end, rho, maxit, epsilon)
         print "Found chemical potential for rho = ", rho, " to be ", mu
     if restoreparams:
         print "Restoring parameters for simulation ..."
         for name, v in restoreparams.items():
             print " - restoring '", name, ", = ", v["value"]
             setParam(dqmchandle, name, v)
-    print "Start dqmc ..."
-    dqmchandle.run()
+    if not "quest" in input:
+        print "Start dqmc ..."
+        dqmchandle.run()
+    else:
+        cfgfile = input["prefix"] + ".in"
+        dqmchandle.writeConfig(cfgfile)
+        subprocess.Popen(str(input["quest"]), cfgfile)

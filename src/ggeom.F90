@@ -186,6 +186,50 @@ subroutine close()
     close(symmetries_output_file_unit)
 end
 
+subroutine writeConfig(fname)
+    type(Param),pointer    :: curr
+    integer :: i, j
+    character(len=256)  :: fname
+    integer, parameter  :: OPT = 666
+    integer :: n
+
+    open(unit = OPT, file = fname)
+    do i = 1, N_Param
+        curr => cfg%record(i)
+        if (curr%ptype .eq. TYPE_REAL) then
+            if (curr%isArray) then
+                write(OPT, "(A,X,'=',X)",advance="no") PARAM_NAME(i)
+                n = cfg%record(DQMC_Find_Param(cfg, PARAM_NAME(i)))%ival
+                do j = 1, n
+                    write(OPT, "(F10.5)", advance="no") curr%rptr(j)
+                    if (j < n) then
+                        write(OPT, "(','X)", advance="no")
+                    end if
+                end do
+                write(OPT, *) ""
+            else
+                write(OPT, "(A,X,'=',X,F10.5)") PARAM_NAME(i), curr%rval
+            end if
+        else if (curr%ptype .eq. TYPE_INTEGER) then
+            if (curr%isArray) then
+                write(OPT, "(A,X,'=',X)",advance="no") PARAM_NAME(i)
+                n = cfg%record(DQMC_Find_Param(cfg, PARAM_NAME(i)))%ival
+                do j = 1, n
+                    write(OPT, "(I10.5,X)", advance="no") curr%iptr(j)
+                    if (j < n) then
+                        write(OPT, "(','X)", advance="no")
+                    end if
+                end do
+                write(OPT, *) ""
+            else
+                write(OPT, "(A,X,'=',X,I10)") PARAM_NAME(i), curr%ival
+            end if
+        else
+            write(OPT, "(A,X,'=',X,A)") PARAM_NAME(i), curr%defaultval
+        end if
+    end do
+    close(OPT)
+end
 
 function calculateDensity(mu) result(rho)
     real(wp)            :: rho

@@ -23,7 +23,7 @@ if __name__ == '__main__':
     betas = input["beta"]
     if (len(betas) == 0):
         sys.exit("No beta values given")
-    numdeci = max(str(betas[0])[::-1].find('.'), str(betas[len(betas) - 1])[::-1].find('.'))
+    numdeci = max(betas[0][::-1].find('.'), betas[len(betas) - 1][::-1].find('.'))
     for beta in betas:
         taskargs = input
         taskargs["beta"] = beta

@@ -3,12 +3,6 @@ import dqmc
 """
 Wrapper functions
 """
-def calculateDensity(mu):
-    return dqmc.ggeom_calculatedensity(mu)
-
-def run():
-    dqmc.ggeom_run()
-
 class DQMCHandler:
 
     def __init__(self, finput):
@@ -18,35 +12,14 @@ class DQMCHandler:
     def __exit__(self, exc_type, exc_value, traceback):
         dqmc.ggeom_close()
 
-    def calcPotentialForDensity(self, mu1, mu2, rho, maxit, epsilon = 1e-10):
-        print "Starting regular falsi ..."
-        print "Calculate start mu = ", mu1, " ..."
-        fs = calculateDensity(float(mu1))
-        print "Start rho = ", fs
-        print "Calculate end mu = ", mu2, " ..."
-        ft = calculateDensity(float(mu2))
-        print "End rho = ", ft
-
-        mu = 0.0
-        for i in range(1, maxit):
-            mu = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2
-            print "new mu = ", mu
-            fr = calculateDensity(float(mu))
-            print "rho = ", fr
-            if (abs(fr - rho) < epsilon):
-                return mu
-            if ((fr - rho) * (ft - rho) > 0):
-                mu2 = mu
-                ft = fr
-            elif ((fs - rho) * (fr - rho) > 0):
-                mu1 = mu
-                fs = fr
-            else:
-                return mu
-        return mu
-
     def run(self):
-        run()
+        dqmc.ggeom_run()
+
+    def calculateDensity(self, mu):
+        return dqmc.ggeom_calculatedensity(mu)
+
+    def writeConfig(self, fname):
+        dqmc.ggeom_writeconfig(fname)
 
     def setParameter(self, name, value, t):
         if (t == "float"):
@@ -71,42 +44,31 @@ class DQMCHandler:
             raise Exception("setParameter: type '", t, "' not supported")
 
     def getParameter(self, name, t):
-        if (t == float):
+        if (t == "float"):
             return dqmc.ggeom_getparameterr(name)
-        elif (t == int):
+        elif (t == "int"):
             return dqmc.ggeom_getparameteri(name)
-        elif (t == str):
+        elif (t == "str"):
             value = ""
             dqmc.ggeom_getparameters(name, value)
             return value
         else:
-            raise Exception("getParameter: type not supported")
+            raise Exception("getParameter: type '" + t + "' not supported")
 
     def setGeomFile(self, gfile):
         dqmc.ggeom_setgeomfile(gfile)
 
     def setBeta(self, beta, dtaumax):
         L = int(beta / dtaumax)
-        if (L == 0):
+        if (L < 10):
             L = 10
             dqmc.ggeom_setparameteri("north", 5)
         elif (abs(float(L) - (beta / dtaumax)) > 1e-4):
             L = L + 1
-
         north = dqmc.ggeom_getparameteri("north")
-        print "beta: ", str(beta), " north: ", north
         dtau = beta / float(L)
         dqmc.ggeom_setparameterr("dtau", dtau)
         dqmc.ggeom_setparameteri("L", L)
 
     def setChemicalPotential(self, mu):
         dqmc.ggeom_setuniformmu(mu)
-
-    def setUpChemicalPotential(self, mu):
-        dqmc.ggeom_setuniformmu_up(mu)
-
-    def setDnChemicalPotential(self, mu):
-        dqmc.ggeom_setuniformmu_dn(mu)
-
-    #def setU(self, U):
-    #    dqmc.ggeom_setuniformU(U)
