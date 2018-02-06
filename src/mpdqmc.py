@@ -92,22 +92,25 @@ if __name__ == '__main__':
                 taskargs["beta"] = beta
                 betastr = ("b{0:." + str(numdeci) + "f}").format(beta)
                 name = prefix + str(betastr)
-                taskargs["prefix"] = name
-                logfile = os.path.join(logdir, name + ".log")
-                params = {}
-                ofile = {}
-                ofile["value"] = name
-                ofile["type"] = "str"
-                params["ofile"] = ofile
-                taskargs["params"] = params
-                qselect = subprocess.check_output(["qselect", "-N", name])
-                if not qselect:
-                    subprocess.Popen(['qsub', '-N', str(name), \
-                                      '-v', "log=\"" + logfile + \
-                                      "\",casedir='" + casedir + \
-                                      "',arg=\"" + str(taskargs) + \
-                                      "\",beta=\"" + betastr + "\"",\
-                                      str(subscript)])
+                if not os.path.isfile(os.path.abspath(name + ".out")):
+                    taskargs["prefix"] = name
+                    logfile = os.path.join(logdir, name + ".log")
+                    params = {}
+                    ofile = {}
+                    ofile["value"] = name
+                    ofile["type"] = "str"
+                    params["ofile"] = ofile
+                    taskargs["params"] = params
+                    qselect = subprocess.check_output(["qselect", "-N", name])
+                    if not qselect:
+                        subprocess.Popen(['qsub', '-N', str(name), \
+                                          '-v', "log=\"" + logfile + \
+                                          "\",casedir='" + casedir + \
+                                          "',arg=\"" + str(taskargs) + \
+                                          "\",beta=\"" + betastr + "\"",\
+                                          str(subscript)])
+                    else:
+                        print "Job '", name, ", already running under '", qselect
                 else:
-                    print "Job '", name, ", already running under '", qselect
+                    print "For job '", name, "', exists a result already (skipping)"
 
