@@ -61,7 +61,7 @@ class DQMCHandler:
         if (L < 2 * north):
             L = 2 * north
         elif (L % north) != 0:
-            L = (int(L) / int(north)) * L + 1
+            L = (int(L) / int(north)) * L + north
         dtau = beta / float(L)
         dqmc.ggeom_setparameterr("dtau", dtau)
         dqmc.ggeom_setparameteri("L", L)

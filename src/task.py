@@ -15,7 +15,6 @@ def setParam(dqmchandle, name, v):
 
 def calcPotentialForDensity(dqmchandle, mu1, mu2, rho, maxit, epsilon = 1e-10):
     print "Starting regular falsi ..."
-    #log = open()
     print "Calculate start mu = ", mu1, " ..."
     sys.stdout.flush()
     fs = dqmchandle.calculateDensity(float(mu1))
@@ -148,9 +147,10 @@ if __name__ == '__main__':
                 print " - restoring '", name, ", = ", v["value"]
                 sys.stdout.flush()
                 setParam(dqmchandle, name, v)
-        #save configuration in ${prefix}.in
-        cfgfile = prefix + ".in"
-        dqmchandle.writeConfig(cfgfile)
+
+    #save configuration in ${prefix}.in
+    cfgfile = prefix + ".in"
+    dqmchandle.writeConfig(cfgfile)
 
     print "Start dqmc ..."
     sys.stdout.flush()
