@@ -100,10 +100,14 @@ if __name__ == '__main__':
                 ofile["type"] = "str"
                 params["ofile"] = ofile
                 taskargs["params"] = params
-                subprocess.Popen(['qsub', '-N', str(name), \
-                                  '-v', "log=\"" + logfile + \
-                                  "\",casedir='" + casedir + \
-                                  "',arg=\"" + str(taskargs) + \
-                                  "\",beta=\"" + betastr + "\"",\
-                                  str(subscript)])
+                qselect = subprocess.check_output(["qselect", "-N", name])
+                if not qselect:
+                    subprocess.Popen(['qsub', '-N', str(name), \
+                                      '-v', "log=\"" + logfile + \
+                                      "\",casedir='" + casedir + \
+                                      "',arg=\"" + str(taskargs) + \
+                                      "\",beta=\"" + betastr + "\"",\
+                                      str(subscript)])
+                else:
+                    print "Job '", name, ", already running under '", qselect
 

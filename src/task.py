@@ -28,7 +28,7 @@ def calcPotentialForDensity(dqmchandle, mu1, mu2, rho, maxit, epsilon = 1e-10):
     mu = 0.0
     for i in range(1, maxit):
         mu = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2
-        print "new mu = ", mu
+        print "iter #", i, " new mu = ", mu
         sys.stdout.flush()
         fr = dqmchandle.calculateDensity(float(mu))
         print "rho = ", fr
