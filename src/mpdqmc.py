@@ -73,7 +73,7 @@ if __name__ == '__main__':
         jobargs = {}
         jobargs["input"] = input
         jobargs["dtaumax"] = dtaumax
-        if "quest" in input: jobargs["quest"] = input["quest"]
+        if "quest" in conf: jobargs["quest"] = conf["quest"]
         if ("logdir" in conf):
             logdir = os.path.abspath(os.path.join(casedir, conf["logdir"]))
             if not os.path.exists(logdir):
