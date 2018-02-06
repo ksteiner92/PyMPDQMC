@@ -67,13 +67,12 @@ if __name__ == '__main__':
 
         #Generate common job parameters
         ###############################
-        casedir = os.path.dirname(os.path.abspath(input))
+        casedir = os.path.dirname(os.path.abspath(arg))
         input = conf["input"]
         prefix = conf["prefix"]
         jobargs = {}
         jobargs["input"] = input
         jobargs["dtaumax"] = dtaumax
-        if "quest" in conf: jobargs["quest"] = conf["quest"]
         if ("logdir" in conf):
             logdir = os.path.abspath(os.path.join(casedir, conf["logdir"]))
             if not os.path.exists(logdir):
@@ -84,8 +83,9 @@ if __name__ == '__main__':
             jobargs["calcmu"] = conf["calcmu"]
 
         #Generate job specific parameters and submit the jobs
-        ##################################################
+        #####################################################
         numdeci = max(str(startbeta)[::-1].find('.'), str(endbeta)[::-1].find('.'))
+        subscript = conf["subscript"]
         for i in range(0, len(jobs)):
             taskargs = jobargs
             for beta in jobs[i]:
@@ -100,5 +100,10 @@ if __name__ == '__main__':
                 ofile["type"] = "str"
                 params["ofile"] = ofile
                 taskargs["params"] = params
-                subprocess.Popen(['qsub', '-N', str(name), '-v', "log=\"" + logfile + "\",casedir='" + casedir + "',arg=\"" + str(taskargs) + "\",beta=\"" + betastr + "\"", 'sub.qsub'])
+                subprocess.Popen(['qsub', '-N', str(name), \
+                                  '-v', "log=\"" + logfile + \
+                                  "\",casedir='" + casedir + \
+                                  "',arg=\"" + str(taskargs) + \
+                                  "\",beta=\"" + betastr + "\"",\
+                                  str(subscript)])
 

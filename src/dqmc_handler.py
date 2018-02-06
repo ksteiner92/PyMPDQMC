@@ -1,8 +1,5 @@
 import dqmc
 
-"""
-Wrapper functions
-"""
 class DQMCHandler:
 
     def __init__(self, finput):
@@ -59,13 +56,12 @@ class DQMCHandler:
         dqmc.ggeom_setgeomfile(gfile)
 
     def setBeta(self, beta, dtaumax):
-        L = int(beta / dtaumax)
-        if (L < 10):
-            L = 10
-            dqmc.ggeom_setparameteri("north", 5)
-        elif (abs(float(L) - (beta / dtaumax)) > 1e-4):
-            L = L + 1
         north = dqmc.ggeom_getparameteri("north")
+        L = int(beta / dtaumax)
+        if (L < 2 * north):
+            L = 2 * north
+        elif (L % north) != 0:
+            L = (int(L) / int(north)) * L + 1
         dtau = beta / float(L)
         dqmc.ggeom_setparameterr("dtau", dtau)
         dqmc.ggeom_setparameteri("L", L)
