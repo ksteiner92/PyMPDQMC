@@ -28,6 +28,8 @@ def calcPotentialForDensity(dqmchandle, mu1, mu2, rho, maxit, epsilon = 1e-10):
     mu = 0.0
     for i in range(1, maxit):
         mu = (rho - ft) * (mu2 - mu1) / (ft - fs) + mu2
+        if (abs(mu2 - mu1) < epsilon * abs(mu2 + mu1)):
+            break
         print "iter #", i, " new mu = ", mu
         sys.stdout.flush()
         fr = dqmchandle.calculateDensity(float(mu))
@@ -77,7 +79,9 @@ if __name__ == '__main__':
     # been done already
     #######################################################
     prefix = input["prefix"]
-    cfgfile = prefix + ".in"
+    indir = input["indir"]
+    infile = os.path.join(os.path.abspath(indir), prefix + ".in")
+    cfgfile = infile
     preprocess = not os.path.isfile(os.path.abspath(cfgfile))
     if preprocess:
         cfgfile = input["input"]
@@ -109,6 +113,12 @@ if __name__ == '__main__':
     if ("gfile" in input):
         gfile = input["gfile"]
         dqmchandle.setGeomFile(gfile)
+
+    #save pre-processing configuration in ${prefix}.in
+    ##################################################
+    predir = input["predir"]
+    precfgfile = os.path.join(os.path.abspath(predir), prefix + ".pre")
+    dqmchandle.writeConfig(precfgfile)
 
     #if there is not ${prefix}.in file given we assume we have to do
     # preprocessing
@@ -149,8 +159,8 @@ if __name__ == '__main__':
                 setParam(dqmchandle, name, v)
 
     #save configuration in ${prefix}.in
-    cfgfile = prefix + ".in"
-    dqmchandle.writeConfig(cfgfile)
+    ###################################
+    dqmchandle.writeConfig(infile)
 
     print "Start dqmc ..."
     sys.stdout.flush()

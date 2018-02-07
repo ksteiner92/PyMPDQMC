@@ -4,6 +4,7 @@ import yaml
 import numpy as np
 import subprocess
 import os
+import sys
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage = "%prog <input>")
@@ -73,11 +74,31 @@ if __name__ == '__main__':
         jobargs = {}
         jobargs["input"] = input
         jobargs["dtaumax"] = dtaumax
+
+        #Generate input file, pre-input file and logfile directories
         if ("logdir" in conf):
             logdir = os.path.abspath(os.path.join(casedir, conf["logdir"]))
             if not os.path.exists(logdir):
                 os.makedirs(logdir)
             jobargs["logdir"] = logdir
+        else:
+            jobargs["logdir"] = "."
+
+        if ("indir" in conf):
+            indir = os.path.abspath(os.path.join(casedir, conf["indir"]))
+            if not os.path.exists(indir):
+                os.makedirs(indir)
+            jobargs["indir"] = indir
+        else:
+            jobargs["indir"] = "."
+
+        if ("predir" in conf):
+            predir = os.path.abspath(os.path.join(casedir, conf["predir"]))
+            if not os.path.exists(predir):
+                os.makedirs(predir)
+            jobargs["predir"] = predir
+        else:
+            jobargs["predir"] = "."
 
         if ("calcmu" in conf):
             jobargs["calcmu"] = conf["calcmu"]
@@ -101,7 +122,7 @@ if __name__ == '__main__':
                     ofile["type"] = "str"
                     params["ofile"] = ofile
                     taskargs["params"] = params
-                    qselect = subprocess.check_output(["qselect", "-N", name])
+                    qselect = subprocess.check_output(["qselect", "-N", name, "-s", "RQWTH"])
                     if not qselect:
                         subprocess.Popen(['qsub', '-N', str(name), \
                                           '-v', "log=\"" + logfile + \
@@ -110,7 +131,7 @@ if __name__ == '__main__':
                                           "\",beta=\"" + betastr + "\"",\
                                           str(subscript)])
                     else:
-                        print "Job '", name, ", already running under '", qselect
+                        print "Job '", name, ", already submitted under '", qselect
                 else:
                     print "For job '", name, "', exists a result already (skipping)"
 

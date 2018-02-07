@@ -69,9 +69,8 @@ if("${MKL_LIBRARIES}" STREQUAL "")
     endif()
 else()
     message(STATUS "Found required mkl libraries")
-    set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fdefault-integer-8")
+    #set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fdefault-integer-8")
     target_link_libraries(dqmc ${MKL_LIBRARIES} pthread dl)
-    #target_link_libraries(dqmc mkl_intel_lp64 mkl_sequential mkl_core stdc++ pthread dl)
 endif()
 
 find_package(OpenMP)
@@ -127,7 +126,8 @@ install(FILES ${CMAKE_SOURCE_DIR}/src/dqmc_handler.py
 install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py
         DESTINATION ${PYTHON_SITE}/dqmc)
 
-#install(CODE "execute_process(COMMAND pyinstaller ${PYTHON_SITE}/dqmc/)")
+install(CODE "execute_process(COMMAND pyinstaller --onefile ${CMAKE_SOURCE_DIR}/src/task.py)")
+install(CODE "execute_process(COMMAND pyinstaller --onefile ${CMAKE_SOURCE_DIR}/src/mpdqmc.py)")
 #install(COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py)
 #include(f2py_add)
 #include("${CMAKE_SOURCE_DIR}/cmake/f2py_add.cmake")
