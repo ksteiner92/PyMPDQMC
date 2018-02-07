@@ -610,7 +610,7 @@ contains
       ! =========
       !
       type(config), intent(inout)  :: cfg          ! configuration
-      character(len=60)            :: iname
+      character(len=256)           :: iname
       integer                      :: status
 
       ! Fetch input file name from command line
