@@ -1,4 +1,3 @@
-#!/home/ksteiner/opt/bin/python
 import optparse
 import yaml
 import numpy as np

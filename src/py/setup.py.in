@@ -1,5 +1,7 @@
 import os
 from setuptools import setup
+import os
+from os.path import relpath
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -8,21 +10,30 @@ from setuptools import setup
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+bindir = os.path.abspath("${CMAKE_BINARY_DIR}")
+srcdir = os.path.abspath("${CMAKE_SOURCE_DIR}")
+rel = relpath(srcdir, bindir)
+
+def relScriptPath(script):
+    return os.path.join(rel, script)
+
 setup(
-    name = "MPDQMC",
+    name = "mpdqmc",
     version = "0.1",
     author = "Klaus Steiner",
     author_email = "klaus.steiner@student.tuwien.ac.at",
-    #description = (""),
-    license = "BSD",
+    description = ("A Determinant Quantum Monte Carlo (DQMC) program for parallel job submission"),
+    license = "MIT",
     #keywords = "example documentation tutorial",
     #url = "http://packages.python.org/an_example_pypi_project",
-    packages=['yaml', 'numpy', 'ast', 'subprocess', 'optparse'],
-    long_description=read('README'),
+    packages=['dqmc'],
+    long_description=read(relScriptPath("README")),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
         "License :: OSI Approved :: BSD License",
     ],
-    
-)
+    scripts=[relScriptPath("src/py/mpdqmc.py"), relScriptPath("src/py/task.py")],
+    install_requires=['numpy', 'pyaml', 'ast'],
+    include_package_data=True,
+    zip_safe=False)

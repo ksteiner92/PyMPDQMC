@@ -201,14 +201,14 @@ subroutine writeConfig(fname)
                 write(OPT, "(A,X,'=',X)",advance="no") PARAM_NAME(i)
                 n = cfg%record(DQMC_Find_Param(cfg, PARAM_NAME(i)))%ival
                 do j = 1, n
-                    write(OPT, "(F10.5)", advance="no") curr%rptr(j)
+                    write(OPT, "(F10.7)", advance="no") curr%rptr(j)
                     if (j < n) then
                         write(OPT, "(','X)", advance="no")
                     end if
                 end do
                 write(OPT, *) ""
             else
-                write(OPT, "(A,X,'=',X,F10.5)") PARAM_NAME(i), curr%rval
+                write(OPT, "(A,X,'=',X,F10.7)") PARAM_NAME(i), curr%rval
             end if
         else if (curr%ptype .eq. TYPE_INTEGER) then
             if (curr%isArray) then

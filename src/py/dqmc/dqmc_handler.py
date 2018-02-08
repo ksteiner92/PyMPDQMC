@@ -13,10 +13,10 @@ class DQMCHandler:
         dqmc.ggeom_run()
 
     def calculateDensity(self, mu):
-        return dqmc.ggeom_calculatedensity(mu)
+        return  dqmc.ggeom_calculatedensity(mu)
 
     def writeConfig(self, fname):
-        dqmc.ggeom_writeconfig(fname)
+         dqmc.ggeom_writeconfig(fname)
 
     def setParameter(self, name, value, t):
         if (t == "float"):

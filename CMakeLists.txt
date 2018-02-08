@@ -41,6 +41,8 @@ endif (NOT CMAKE_BUILD_TYPE)
 
 option(USE_CKB "Use checkboard decomposition" OFF)
 option(USE_CUDA "Use GPU support" OFF)
+set(F2PY_EXEC f2py CACHE FILEPATH "f2py executable")
+set(F90WRAP_EXEC f90wrap CACHE FILEPATH "f90wrap executable")
 
 # set cmake module path for *.cmake
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
@@ -69,7 +71,6 @@ if("${MKL_LIBRARIES}" STREQUAL "")
     endif()
 else()
     message(STATUS "Found required mkl libraries")
-    #set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fdefault-integer-8")
     target_link_libraries(dqmc ${MKL_LIBRARIES} pthread dl)
 endif()
 
@@ -92,13 +93,8 @@ execute_process(
         OUTPUT_VARIABLE PYTHON_SITE
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-message(STATUS "${PYTHON_SITE}")
-
-set(F2PY_EXEC f2py)
-set(F90WRAP_EXEC f90wrap)
-
 add_custom_command(OUTPUT ${F2PY_PREFIX}ggeom.f90
-        COMMAND ${F90WRAP_EXEC} --kind-map ${CMAKE_SOURCE_DIR}/kind.map --prefix ${F2PY_PREFIX} -m ${F2PY_MODULE} ${CMAKE_SOURCE_DIR}/src/ggeom.F90
+        COMMAND ${F90WRAP_EXEC} --kind-map ${CMAKE_SOURCE_DIR}/src/py/kind.map --prefix ${F2PY_PREFIX} -m ${F2PY_MODULE} ${CMAKE_SOURCE_DIR}/src/ggeom.F90
         DEPENDS dqmc
         POST_BUILD)
 
@@ -109,26 +105,15 @@ add_custom_command(OUTPUT dqmc.so
         DEPENDS ${F2PY_PREFIX}ggeom.f90
         POST_BUILD)
 
-#add_custom_command(OUTPUT dist/task/task
-#        COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py
-#        DEPENDS dqmc.so
-#        POST_BUILD)
+add_custom_target(mpdqmc ALL DEPENDS dqmc.so)
 
-add_custom_target(ggeom ALL DEPENDS dqmc.so)
+set(SETUP_PY_IN "${CMAKE_SOURCE_DIR}/src/py/setup.py.in")
+set(SETUP_PY    "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
 
+configure_file(${SETUP_PY_IN} ${SETUP_PY})
 
-install(FILES ${CMAKE_BINARY_DIR}/dqmc.so
-        DESTINATION ${PYTHON_SITE}/dqmc)
+install(FILES ${CMAKE_BINARY_DIR}/dqmc.so DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
+install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/__init__.py DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
+install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/dqmc_handler.py DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
+install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} setup.py install)")
 
-install(FILES ${CMAKE_SOURCE_DIR}/src/dqmc_handler.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
-install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py
-        DESTINATION ${PYTHON_SITE}/dqmc)
-
-install(CODE "execute_process(COMMAND pyinstaller --onefile ${CMAKE_SOURCE_DIR}/src/task.py)")
-install(CODE "execute_process(COMMAND pyinstaller --onefile ${CMAKE_SOURCE_DIR}/src/mpdqmc.py)")
-#install(COMMAND pyinstaller ${CMAKE_SOURCE_DIR}/src/task.py)
-#include(f2py_add)
-#include("${CMAKE_SOURCE_DIR}/cmake/f2py_add.cmake")
-#F2PY_ADD(MODULE ggeom SRC "${CMAKE_SOURCE_DIR}/src/ggeom.F90" EXTERNAL_LIBS -ldqmc ${CMAKE_SOURCE_DIR}/cmake-build-debug)

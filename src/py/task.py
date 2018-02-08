@@ -1,4 +1,3 @@
-#!/home/ksteiner/opt/bin/python
 import os
 import sys
 from dqmc import dqmc_handler
