@@ -1,4 +1,4 @@
-#PyMPDQMC
+# PyMPDQMC
 
 A python module for wrapping the example 'ggeom' executable of the quest DQMC (Determinant Quantum Monte Carlo) simulator.
 It allows to run different temperature calculations in parallel by automatically submitting it through an sbatch script on a cluster.
@@ -6,7 +6,7 @@ Before the actual simulation a a pre-processing can be performed and input param
 The current supported pre-processing is calculating the chemical potential for a given filling. This is relevant for
 non particle hole symmetric systems.
 
-##Usage
+## Usage
 
 The package comes with an 'mpdqmc.py' script which needs as argument an input file. An example input file is given
 below. The input file uses the yaml syntax.
@@ -88,8 +88,29 @@ predir: pre
 #jobs. The current supported grid scheduler is
 #sun grid engine (qsub). The script gets the
 #variables ${casedir} (root directory of the
-#simulations), §{log} (path to logfile) and
+#simulations), ${log} (path to logfile) and
 #${beta} (temperature)
 # mandatory
 subscript: sub.qsub
+```
+
+## Installation
+
+To install PyMPDQMC on your system be sure you have the following requirements
+* cmake >= 3.1
+* python2
+* f2py and f90wrap
+* linear algebra library MKL or blas
+* OpenMP
+* c++ and fortran compiler
+
+The scripts itself uses some python module which should be installed automatically.
+Make sure you have permissions for that. A way to install it is
+
+```commandline
+mkdir build
+cd build
+cmake ..
+make
+make install
 ```
