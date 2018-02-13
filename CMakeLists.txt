@@ -115,5 +115,6 @@ configure_file(${SETUP_PY_IN} ${SETUP_PY})
 install(FILES ${CMAKE_BINARY_DIR}/dqmc.so DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
 install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/__init__.py DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
 install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/dqmc_handler.py DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
+install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/extractor.py DESTINATION ${CMAKE_BINARY_DIR}/dqmc)
 install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} setup.py install)")
 

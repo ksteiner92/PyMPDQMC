@@ -53,7 +53,7 @@ for root, dirs, files in  os.walk(projdir):
 							spacialdep = False
 							break
 						match = True
-					        if len(keys) > 2:
+						if len(keys) > 2:
 							for i in range(2, len(keys)):
 								if i < 4:
 									if tokens[i - 2] != keys[i]:
@@ -74,7 +74,7 @@ for root, dirs, files in  os.walk(projdir):
 				if len(key) > 0:
 					res[key] = values
 #res.sort(k = lambda x: x[0][])
-for k, v in res.items():
+for k, v in sorted(res.iteritems()):
 	sys.stdout.write(str(k[0]) + "  " + str(k[1]) + "  ")
 	for value in v:
 		sys.stdout.write(str(value) + "  ")
