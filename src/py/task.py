@@ -1,6 +1,6 @@
 import os
 import sys
-from dqmc import dqmc_handler
+from libdqmc import dqmc_handler
 import optparse
 import ast
 import numpy

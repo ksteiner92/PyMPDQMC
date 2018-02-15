@@ -1,1 +1,1 @@
-include dqmc/dqmc.so
+include libdqmc/dqmc.so
