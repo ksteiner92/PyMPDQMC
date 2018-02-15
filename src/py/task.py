@@ -75,7 +75,7 @@ if __name__ == '__main__':
     input = ast.literal_eval(args[0])
 
     #check if ${prefix}.in exists, if so, preprocessing has
-    # been done already
+    #been done already
     #######################################################
     prefix = input["prefix"]
     indir = input["indir"]
