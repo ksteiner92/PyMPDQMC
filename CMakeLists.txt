@@ -10,7 +10,7 @@ if (NOT CMAKE_BUILD_TYPE)
             FORCE)
 endif (NOT CMAKE_BUILD_TYPE)
 
-option(USE_CKB CACHE "Use checkboard decomposition" OFF)
+option(USE_CKB "Use checkboard decomposition" OFF)
 #option(USE_CUDA "Use GPU support" OFF)
 set(F2PY_EXEC f2py CACHE FILEPATH "f2py executable")
 set(F90WRAP_EXEC f90wrap CACHE FILEPATH "f90wrap executable")
