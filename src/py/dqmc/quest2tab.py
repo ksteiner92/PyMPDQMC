@@ -1,9 +1,16 @@
 import sys
 import os
-from pandas import DataFrame
 import pandas as pd
+import math
+from pandas import HDFStore,DataFrame
 
 class QuestOutputParser:
+
+    def parseTDMSpacialBlock(self, f, lineIdx):
+        print ""
+
+    def parseTDMFTBlock(self, f, lineIdx):
+        print ""
 
     def parse(self, outfilename):
         frames = {}
@@ -16,8 +23,8 @@ class QuestOutputParser:
                 if line in self.__spacialBlocks:
                     block = self.__spacialBlocks[line]
                     print " - parsing '" + block[0] + "' ..."
-                    res = block[1](self, lines, idx + 1)
-                    frames[block[0]] = res[0]
+                    res = block[2](self, lines, idx + 1)
+                    frames[block[1]] = res[0]
                     idx = res[1]
                 elif line in self.__scalarBlocks:
                     block = self.__scalarBlocks[line]
@@ -28,8 +35,8 @@ class QuestOutputParser:
                 elif line in self.__kBlocks:
                     block = self.__kBlocks[line]
                     print " - parsing '" + block[0] + "' ..."
-                    res = block[2](self, lines, idx + 1, self.__kgrids[block[1]])
-                    frames[block[0]] = res[0]
+                    res = block[3](self, lines, idx + 1, self.__kgrids[block[1]])
+                    frames[block[2]] = res[0]
                     idx = res[1]
                 elif line in self.__kgridBlocks:
                     block = self.__kgridBlocks[line]
@@ -39,13 +46,57 @@ class QuestOutputParser:
                     idx = res[1]
                 else:
                     idx += 1
-        with open(os.path.splitext(outfilename)[0] + ".tdm.out", "r") as f:
-            print "parsing time dependent measurements ..."
+        tdmOutputFile = os.path.splitext(outfilename)[0] + ".tdm.out"
+        if frames and os.path.isfile(tdmOutputFile):
+            with open(os.path.splitext(outfilename)[0] + ".tdm.out", "r") as f:
+                print "parsing time dependent measurements ..."
+                id = None
+                idx = 0
+                lines = f.readlines()
+                kdtm = False
+                res = {}
+                for line in lines:
+                    tokens = line.strip().split()
+                    idx += 1
+                    if not id:
+                        if "k=" in tokens or kdtm:
+                            id = tokens[0]
+                            kdtm = True
+                            kclassOffset = tokens.index("k=")
+                            for i in range(1, kclassOffset):
+                                id += "_" + tokens[i]
+                            preCols = []
+                            kgrid = self.__kgrids[self.__tdmGridIDMapping[tokens[0]]]
+                            kclass = int(tokens[kclassOffset + 1])
+                            kpoints = kgrid[kclass]
+                            pairOffset = tokens.index("pair=")
+                            orb1 = int(tokens[pairOffset + 1][0])
+                            orb2 = int(tokens[pairOffset + 2][0])
+                            (dfRaw, idx) = parseTDMFTBlock(lines, idx)
+                            df = None
+                            for kpoint in kpoints:
+                                dfSub = dfRaw.copy()
+                                dfSub = dfSub.insert(0, "kz", kpoint[2])
+                                dfSub = dfSub.insert(0, "ky", kpoint[1])
+                                dfSub = dfSub.insert(0, "kx", kpoint[0])
+                                dfSub = dfSub.insert(0, "kclass", kclass)
+                                dfSub = dfSub.insert(0, "orb2", orb1)
+                                dfSub = dfSub.insert(0, "orb1", orb1)
+                                if not df:
+                                    df = dfSub
+                                else:
+                                    df = pd.concat([dfSub, df])
+                            res[id]
+                        else:
 
-        return frames
+
+
+            return frames
+        else:
+            return ()
 
     def parseScalarQuantities(self, f, lineIdx):
-        cols = ["name", "value", "error"]
+        cols = ["name", "value", "error", "type"]
         dat = []
         lineCount = 0
         for line in f[lineIdx:]:
@@ -58,11 +109,12 @@ class QuestOutputParser:
             tokens = line.split(':')
             if len(tokens) < 2:
                 continue
-            row = [None] * 3
+            row = [None] * 4
             row[0] = tokens[0].strip()
             valtokens = tokens[1].split()
             values = []
             errors = []
+            type = None
             parseValues = True
             for valtoken in valtokens:
                 valtoken = valtoken.strip()
@@ -74,24 +126,31 @@ class QuestOutputParser:
                 if parseValues:
                     try:
                         values.append(float(valtoken))
+                        if not type:
+                            type = "float"
                     except ValueError:
                         values.append(valtoken)
+                        if not type:
+                            type = "str"
                 else:
                     errors.append(float(valtoken))
             if len(values) == 1:
                 row[1] = values[0]
             elif len(values) > 1:
                 row[1] = values
+                type = "list"
             if len(errors) == 1:
                 row[2] = errors[0]
             elif len(errors) > 1:
                 row[2] = errors
+            row[3] = type
             if row[1]:
                 dat.append(row)
-        return pd.DataFrame(data = dat, columns=cols), (lineIdx + lineCount)
+        df = pd.DataFrame(data = dat, columns=cols), (lineIdx + lineCount)
+        return df
 
     def parseSparcialQuantity(self, f, lineIdx):
-        cols = ["orb1", "orb2", "rx", "ry", "rz", "sym", "value", "error"]
+        cols = ["orb1", "orb2", "rx", "ry", "rz", "dist", "sym", "value", "error"]
         dat = []
         lineCount = 0
         for line in f[lineIdx:]:
@@ -104,8 +163,11 @@ class QuestOutputParser:
             if line[0] == '=':
                 break
             tokens = line.split()
+            rx = float(tokens[2])
+            ry = float(tokens[3])
+            rz = float(tokens[4])
             dat.append([int(tokens[0]), int(tokens[1]), float(tokens[2]), float(tokens[3]), float(tokens[4]), \
-                        int(tokens[5]), float(tokens[6]), float(tokens[8])])
+                        math.sqrt(rx * rx + ry * ry + rz * rz), int(tokens[5]), float(tokens[6]), float(tokens[8])])
         return pd.DataFrame(data = dat, columns=cols), (lineIdx + lineCount)
 
     def parseKGrid(self, f, lineIdx):
@@ -161,28 +223,36 @@ class QuestOutputParser:
 
     __kgrids = {}
 
+    __tdmGridIDMapping = {
+        "Gfun" : "Grid for Green's function",
+        "SxSx": "Grid for spin/charge correlations",
+        "SzSz": "Grid for spin/charge correlations",
+        "Den-Den": "Grid for spin/charge correlations",
+        "S-wave": "Grid for spin/charge correlations",
+    }
+
     __spacialBlocks = {
-        "Mean Equal time Green's function:": ("<G(r,r',0)>", parseSparcialQuantity),
-        "Up Equal time Green's function:": ("<G_up(r,r',0)>", parseSparcialQuantity),
-        "Down Equal time Green's function:": ("<G_dn(r,r',0)>", parseSparcialQuantity),
-        "Density-density correlation fn: (up-up)": ("<n_up(r,0)n_up(r',0)>", parseSparcialQuantity),
-        "Density-density correlation fn: (up-dn)": ("<n_up(r,0)n_dn(r',0)>", parseSparcialQuantity),
-        "XX Spin correlation function:": ("<S_x(r,0)S_x(r',0)>", parseSparcialQuantity),
-        "ZZ Spin correlation function:": ("<S_z(r,0)S_z(r',0)>", parseSparcialQuantity),
-        "Average Spin correlation function:": ("<S(r,0)S(r',0)>", parseSparcialQuantity),
-        "Pairing correlation function:": ("<n_up(r,0)n_dn(r,0)n_up(r',0)n_dn(r',0)>", parseSparcialQuantity)
+        "Mean Equal time Green's function:": ("<G(r,r',0)>", "MEQTG", parseSparcialQuantity),
+        "Up Equal time Green's function:": ("<G_up(r,r',0)>", "MEQTGup", parseSparcialQuantity),
+        "Down Equal time Green's function:": ("<G_dn(r,r',0)>", "MEQTGdn", parseSparcialQuantity),
+        "Density-density correlation fn: (up-up)": ("<n_up(r,0)n_up(r',0)>", "MEQTDupDup", parseSparcialQuantity),
+        "Density-density correlation fn: (up-dn)": ("<n_up(r,0)n_dn(r',0)>", "MEQTDupDdn", parseSparcialQuantity),
+        "XX Spin correlation function:": ("<S_x(r,0)S_x(r',0)>", "MEQTSxSx", parseSparcialQuantity),
+        "ZZ Spin correlation function:": ("<S_z(r,0)S_z(r',0)>", "MEQTSzSz", parseSparcialQuantity),
+        "Average Spin correlation function:": ("<S(r,0)S(r',0)>", "MEQTSS", parseSparcialQuantity),
+        "Pairing correlation function:": ("<n_up(r,0)n_dn(r,0)n_up(r',0)n_dn(r',0)>", "MEQTP", parseSparcialQuantity)
     }
 
     __kBlocks = {
-        "FT of Ave Equal t Green's function:": ("<G(k,k',0)>", "Grid for Green's function", parseFTQuantity),
-        "FT of Up Equal t Green's function:": ("<G_up(k,k',0)>", "Grid for Green's function", parseFTQuantity),
-        "FT of Dn Equal t Green's function:": ("<G_dn(k,k',0)>", "Grid for Green's function", parseFTQuantity),
-        "FT of Density-density correlation fn: (up-up)": ("<n_up(k,0)n_up(k',0)>", "Grid for spin/charge correlations", parseFTQuantity),
-        "FT of Density-density correlation fn: (up-dn)": ("<n_up(k,0)n_dn(k',0)>", "Grid for spin/charge correlations", parseFTQuantity),
-        "FT of XX spin correlation fn:": ("<S_x(k,0)S_x(k',0)>", "Grid for spin/charge correlations", parseFTQuantity),
-        "FT of ZZ spin correlation fn:": ("<S_z(k,0)S_z(k',0)>", "Grid for spin/charge correlations", parseFTQuantity),
-        "FT of Average spin correlation fn:": ("<S(k,0)S(k',0)>", "Grid for spin/charge correlations", parseFTQuantity),
-        "FT of Pairing correlation fn:": ("<n_up(k,0)n_dn(k,0)n_up(k',0)n_dn(k',0)>", "Grid for spin/charge correlations", parseFTQuantity)
+        "FT of Ave Equal t Green's function:": ("<G(k,k',0)>", "Grid for Green's function", "FTMEQTG", parseFTQuantity),
+        "FT of Up Equal t Green's function:": ("<G_up(k,k',0)>", "Grid for Green's function", "FTMEQTGup", parseFTQuantity),
+        "FT of Dn Equal t Green's function:": ("<G_dn(k,k',0)>", "Grid for Green's function", "FTMEQTGdn", parseFTQuantity),
+        "FT of Density-density correlation fn: (up-up)": ("<n_up(k,0)n_up(k',0)>", "Grid for spin/charge correlations", "FTMEQTDupDup", parseFTQuantity),
+        "FT of Density-density correlation fn: (up-dn)": ("<n_up(k,0)n_dn(k',0)>", "Grid for spin/charge correlations", "FTMEQTDupDdn", parseFTQuantity),
+        "FT of XX spin correlation fn:": ("<S_x(k,0)S_x(k',0)>", "Grid for spin/charge correlations", "FTMEQTSxSx", parseFTQuantity),
+        "FT of ZZ spin correlation fn:": ("<S_z(k,0)S_z(k',0)>", "Grid for spin/charge correlations", "FTMEQTSzSz", parseFTQuantity),
+        "FT of Average spin correlation fn:": ("<S(k,0)S(k',0)>", "Grid for spin/charge correlations", "FTMEQTSS", parseFTQuantity),
+        "FT of Pairing correlation fn:": ("<n_up(k,0)n_dn(k,0)n_up(k',0)n_dn(k',0)>", "Grid for spin/charge correlations", "FTMEQTP", parseFTQuantity)
     }
 
     __scalarBlocks = {
@@ -202,8 +272,8 @@ class Extractor:
     def setProjectDir(self, projdir):
         self.__projdir = os.path.abspath(projdir)
 
-    def extract(self, *args):
-        frames = []
+    def extract(self, *keys):
+        frames = None
         for root, dirs, files in  os.walk(self.__projdir):
             for f in files:
                 fnameparts = os.path.splitext(f)
@@ -211,14 +281,35 @@ class Extractor:
                     print "Parsing simulation '" + str(f) + "' ..."
                     parser = QuestOutputParser()
                     simFrames = parser.parse(os.path.realpath(os.path.join(root, f)))
+                    if not simFrames:
+                        continue
                     simParams = simFrames["Parameters"]
-                    beta =  float(simParams[simParams.name == "beta"].value)
-                    U = float(simParams[simParams.name == "U"].value[0][0])
-                    print beta, U
-                    frames.append(simFrames)
-                    break
-
-        #return (pd.DataFrame(data = res, columns=cols), pd.DataFrame(data = spacial), pd.DataFrame(data = tdm))
+                    keyValues = []
+                    for key in keys:
+                        row = simParams[simParams.name == key]
+                        type = str(row.type).split()[1]
+                        if type == "float":
+                            keyValues.append(float(row.value))
+                        elif type == "list":
+                            keyValues.append(float(row.value[0][0]))
+                    initFrames = not frames
+                    if initFrames:
+                        frames = {}
+                    for k, frame in simFrames.iteritems():
+                        for key, keyValue in zip(keys, keyValues):
+                            frame[str(key)] = keyValue
+                        if initFrames:
+                            frames[k] = frame
+                        else:
+                            frames[k] = pd.concat([frames[k], frame])
+        return frames
 
 ext = Extractor()
-ext.extract("beta", "U")
+#ext.setProjectDir("/home/klsteine/kagome/dqmc/res/5x5.2")
+frames = ext.extract("beta", "U")
+hdf = HDFStore("kagome.5x5.hdf5")
+for k, frame in frames.iteritems():
+    if k != "Parameters":
+        hdf.put(k, frame, format='table', data_columns=True)
+print hdf
+hdf.close()
