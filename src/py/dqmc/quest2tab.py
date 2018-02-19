@@ -10,7 +10,49 @@ class QuestOutputParser:
         print ""
 
     def parseTDMFTBlock(self, f, lineIdx):
-        print ""
+        cols = ["orb1", "orb2", "kclass", "kx", "ky", "kz", "tau", "value", "error"]
+        tokens = f[lineIdx].strip().split()
+        lineIdx += 1
+        id = tokens[0]
+        kdtm = True
+        kclassOffset = tokens.index("k=")
+        for i in range(1, kclassOffset):
+            id += "_" + tokens[i]
+        kgrid = self.__kgrids[self.__tdmGridIDMapping[tokens[0]]]
+        kclass = int(tokens[kclassOffset + 1])
+        kpoints = kgrid[kclass]
+        pairOffset = tokens.index("pair=")
+        #TODO fetch index of ,
+        orb1 = int(tokens[pairOffset + 1][0])
+        orb2 = int(tokens[pairOffset + 2][0])
+        dat = []
+        for line in f[lineIdx:]:
+            line = f[lineIdx].strip()
+            lineIdx += 1
+            if len(line) < 1:
+                continue
+            if len(line) < 9:
+                raise Exception("Too less columns")
+            if line[0] == '=':
+                break
+            tokens = line.split()
+            tau = float(tokens[0])
+            value = float(tokens[2]) + float(tokens[6])
+            for kpoint in kpoints:
+                dat.apppend([orb1, orb2, kclass, kpoint[0], kpoint[1], kpoint[2], tau, ])
+        df = None
+        for kpoint in kpoints:
+            dfSub = dfRaw.copy()
+            dfSub = dfSub.insert(0, "kz", kpoint[2])
+            dfSub = dfSub.insert(0, "ky", kpoint[1])
+            dfSub = dfSub.insert(0, "kx", kpoint[0])
+            dfSub = dfSub.insert(0, "kclass", kclass)
+            dfSub = dfSub.insert(0, "orb2", orb1)
+            dfSub = dfSub.insert(0, "orb1", orb1)
+            if not df:
+                df = dfSub
+            else:
+                df = pd.concat([dfSub, df])
 
     def parse(self, outfilename):
         frames = {}
