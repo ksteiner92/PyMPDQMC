@@ -3,56 +3,50 @@ import os
 import pandas as pd
 import math
 from pandas import HDFStore,DataFrame
+import re
 
 class QuestOutputParser:
 
-    def parseTDMSpacialBlock(self, f, lineIdx):
-        print ""
-
-    def parseTDMFTBlock(self, f, lineIdx):
-        cols = ["orb1", "orb2", "kclass", "kx", "ky", "kz", "tau", "value", "error"]
-        tokens = f[lineIdx].strip().split()
-        lineIdx += 1
-        id = tokens[0]
-        kdtm = True
-        kclassOffset = tokens.index("k=")
-        for i in range(1, kclassOffset):
-            id += "_" + tokens[i]
-        kgrid = self.__kgrids[self.__tdmGridIDMapping[tokens[0]]]
-        kclass = int(tokens[kclassOffset + 1])
-        kpoints = kgrid[kclass]
-        pairOffset = tokens.index("pair=")
-        #TODO fetch index of ,
-        orb1 = int(tokens[pairOffset + 1][0])
-        orb2 = int(tokens[pairOffset + 2][0])
+    def parseTDMSpacialBlock(self, f, lineIdx, orb1, orb2, r, sym):
+        cols = ["orb1", "orb2", "rx", "ry", "rz", "sym", "tau", "value", "error"]
         dat = []
         for line in f[lineIdx:]:
-            line = f[lineIdx].strip()
+            line = line.strip()
             lineIdx += 1
             if len(line) < 1:
                 continue
-            if len(line) < 9:
+            if len(line) < 4:
+                raise Exception("Too less columns")
+            if line[0] == '=':
+                break
+            tokens = line.split()
+            dat.append([orb1, orb2, r[0], r[1], r[2], sym, float(tokens[0]), float(tokens[1]), float(tokens[3])])
+
+        return pd.DataFrame(data = dat, columns=cols), lineIdx
+
+    def parseTDMFTBlock(self, f, lineIdx, orb1, orb2, kclass, kgrid):
+        cols = ["orb1", "orb2", "kclass", "kx", "ky", "kz", "tau", "value", "error"]
+        kpoints = kgrid[kclass]
+        dat = []
+        for line in f[lineIdx:]:
+            line = line.strip()
+            lineIdx += 1
+            if len(line) < 1:
+                continue
+            if len(line) < 10:
                 raise Exception("Too less columns")
             if line[0] == '=':
                 break
             tokens = line.split()
             tau = float(tokens[0])
-            value = float(tokens[2]) + float(tokens[6])
+            rawValues = re.findall("\((.*?)\)", line)
+            valParts = rawValues[0].strip().split('+-')
+            valParts.extend(rawValues[1].strip().split('+-'))
+            value = float(valParts[0]) + float(valParts[2]) * 1j
+            error = float(valParts[1]) + float(valParts[3]) * 1j
             for kpoint in kpoints:
-                dat.apppend([orb1, orb2, kclass, kpoint[0], kpoint[1], kpoint[2], tau, ])
-        df = None
-        for kpoint in kpoints:
-            dfSub = dfRaw.copy()
-            dfSub = dfSub.insert(0, "kz", kpoint[2])
-            dfSub = dfSub.insert(0, "ky", kpoint[1])
-            dfSub = dfSub.insert(0, "kx", kpoint[0])
-            dfSub = dfSub.insert(0, "kclass", kclass)
-            dfSub = dfSub.insert(0, "orb2", orb1)
-            dfSub = dfSub.insert(0, "orb1", orb1)
-            if not df:
-                df = dfSub
-            else:
-                df = pd.concat([dfSub, df])
+                dat.append([orb1, orb2, kclass, kpoint[0], kpoint[1], kpoint[2], tau, value, error])
+        return pd.DataFrame(data = dat, columns=cols), lineIdx
 
     def parse(self, outfilename):
         frames = {}
@@ -95,47 +89,56 @@ class QuestOutputParser:
                 id = None
                 idx = 0
                 lines = f.readlines()
-                kdtm = False
                 res = {}
-                for line in lines:
-                    tokens = line.strip().split()
+                while idx < len(lines):
+                    line = lines[idx].strip()
                     idx += 1
-                    if not id:
-                        if "k=" in tokens or kdtm:
-                            id = tokens[0]
-                            kdtm = True
-                            kclassOffset = tokens.index("k=")
-                            for i in range(1, kclassOffset):
+                    if len(line) < 1:
+                        continue
+                    if "Conductivity" in line or "SelfEn" in line:
+                        l = line
+                        while idx < len(lines) and (len(line) < 1 or l[0] != '='):
+                            l = lines[idx].strip()
+                            idx += 1
+                        idx += 1
+                        continue
+                    tokens = line.split()
+                    df = None
+                    if "k=" in tokens:
+                        id = "FT" + tokens[0]
+                        kclassOffset = tokens.index("k=")
+                        for i in range(1, kclassOffset):
+                            id += "_" + tokens[i]
+                        kgrid = self.__kgrids[self.__tdmGridIDMapping[tokens[0]]]
+                        kclass = int(tokens[kclassOffset + 1])
+                        pairOffset = tokens.index("pair=")
+                        orb1 = int(tokens[pairOffset + 1][0][:len(tokens[pairOffset + 1]) - 1])
+                        orb2 = int(tokens[pairOffset + 2][0])
+                        (df, idx) = self.parseTDMFTBlock(lines, idx, orb1, orb2, kclass, kgrid)
+                    else:
+                        id = tokens[0]
+                        orbOffset = 1
+                        orb1 = 0
+                        for i in range(1, len(tokens)):
+                            try:
+                                orb1 = int(tokens[i])
+                                orbOffset = i
+                                break
+                            except ValueError:
                                 id += "_" + tokens[i]
-                            preCols = []
-                            kgrid = self.__kgrids[self.__tdmGridIDMapping[tokens[0]]]
-                            kclass = int(tokens[kclassOffset + 1])
-                            kpoints = kgrid[kclass]
-                            pairOffset = tokens.index("pair=")
-                            orb1 = int(tokens[pairOffset + 1][0])
-                            orb2 = int(tokens[pairOffset + 2][0])
-                            (dfRaw, idx) = parseTDMFTBlock(lines, idx)
-                            df = None
-                            for kpoint in kpoints:
-                                dfSub = dfRaw.copy()
-                                dfSub = dfSub.insert(0, "kz", kpoint[2])
-                                dfSub = dfSub.insert(0, "ky", kpoint[1])
-                                dfSub = dfSub.insert(0, "kx", kpoint[0])
-                                dfSub = dfSub.insert(0, "kclass", kclass)
-                                dfSub = dfSub.insert(0, "orb2", orb1)
-                                dfSub = dfSub.insert(0, "orb1", orb1)
-                                if not df:
-                                    df = dfSub
-                                else:
-                                    df = pd.concat([dfSub, df])
-                            res[id]
-                        else:
-
-
-
-            return frames
-        else:
+                        orb2 = int(tokens[orbOffset + 1])
+                        r = [float(tokens[orbOffset + 2]), float(tokens[orbOffset + 3]), float(tokens[orbOffset + 4])]
+                        sym = int(tokens[orbOffset + 5])
+                        (df, idx) = self.parseTDMSpacialBlock(lines, idx, orb1, orb2, r, sym)
+                    if not id in res:
+                        res[id] = df
+                    else:
+                        res[id] = pd.concat([res[id], df])
+                for k, v in res.iteritems():
+                    frames["tdm/" + k] = v
+        elif not frames:
             return ()
+        return frames
 
     def parseScalarQuantities(self, f, lineIdx):
         cols = ["name", "value", "error", "type"]
@@ -352,6 +355,6 @@ frames = ext.extract("beta", "U")
 hdf = HDFStore("kagome.5x5.hdf5")
 for k, frame in frames.iteritems():
     if k != "Parameters":
-        hdf.put(k, frame, format='table', data_columns=True)
+        hdf.put(k, frame, format='table', data_columns=True, index=False)
 print hdf
 hdf.close()
