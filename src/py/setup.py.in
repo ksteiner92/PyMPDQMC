@@ -33,7 +33,7 @@ setup(
         "Topic :: Utilities",
         "License :: OSI Approved :: BSD License",
     ],
-    scripts=[relScriptPath("src/py/plot.py"), relScriptPath("src/py/mpdqmc.py"), relScriptPath("src/py/task.py"), relScriptPath("src/py/extract.py")],
+    scripts=[relScriptPath("src/py/quest2hdf5.py"), relScriptPath("src/py/mpdqmc.py"), relScriptPath("src/py/task.py")],
     install_requires=['numpy', 'pyaml', 'ast'],
     include_package_data=True,
     zip_safe=False)
