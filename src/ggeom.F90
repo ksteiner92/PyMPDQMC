@@ -141,6 +141,7 @@ subroutine setGeomFile(gfile)
         !Transfer info in Hub%S
         call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
     endif
+    call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
 
     call DQMC_Hub_Config(Hub, cfg)
 end
