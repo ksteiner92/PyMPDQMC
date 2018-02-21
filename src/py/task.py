@@ -94,6 +94,9 @@ if __name__ == '__main__':
     if ("mu" in input):
         dqmchandle.setChemicalPotential(float(input["mu"]))
 
+    if "minLFactor" in input:
+        dqmchandle.setMinLFactor(int(input["minLFactor"]))
+
     #set temperature
     ################
     dtaumax = input["dtaumax"]

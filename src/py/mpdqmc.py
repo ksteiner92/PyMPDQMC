@@ -87,6 +87,8 @@ for arg in args:
     jobargs = {}
     jobargs["input"] = input
     jobargs["dtaumax"] = dtaumax
+    if "minLFactor" in conf:
+        jobargs["minLFactor"] = conf["minLFactor"]
 
     #Generate input file, pre-input file and logfile directories
     if ("logdir" in conf):

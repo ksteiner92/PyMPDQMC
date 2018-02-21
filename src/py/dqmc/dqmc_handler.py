@@ -2,6 +2,8 @@ import dqmc
 
 class DQMCHandler:
 
+    __minLFactor = 2
+
     def __init__(self, finput):
         if not dqmc.ggeom_init(finput):
             raise Exception("Could not initialize dqmc module")
@@ -55,11 +57,14 @@ class DQMCHandler:
     def setGeomFile(self, gfile):
         dqmc.ggeom_setgeomfile(gfile)
 
+    def setMinLFactor(self, minLFactor):
+        self.__minLFactor = minLFactor
+
     def setBeta(self, beta, dtaumax):
         north = dqmc.ggeom_getparameteri("north")
         L = int(beta / dtaumax)
-        if (L < 2 * north):
-            L = 2 * north
+        if (L < self.__minLFactor * north):
+            L = self.__minLFactor * north
         elif (L % north) != 0:
             L = (int(L) / int(north)) * north + north
         dtau = beta / float(L)
