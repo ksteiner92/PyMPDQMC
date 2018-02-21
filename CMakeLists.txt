@@ -119,6 +119,5 @@ install(FILES ${CMAKE_SOURCE_DIR}/src/py/MANIFEST.in DESTINATION ${CMAKE_BINARY_
 install(FILES ${CMAKE_BINARY_DIR}/dqmc.so DESTINATION ${CMAKE_BINARY_DIR}/${PYDQMC_MOD})
 install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/__init__.py DESTINATION ${CMAKE_BINARY_DIR}/${PYDQMC_MOD})
 install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/dqmc_handler.py DESTINATION ${CMAKE_BINARY_DIR}/${PYDQMC_MOD})
-install(FILES ${CMAKE_SOURCE_DIR}/src/py/dqmc/extractor.py DESTINATION ${CMAKE_BINARY_DIR}/${PYDQMC_MOD})
 install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} setup.py install)")
 
