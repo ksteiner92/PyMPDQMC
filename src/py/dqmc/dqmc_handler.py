@@ -57,6 +57,9 @@ class DQMCHandler:
     def setGeomFile(self, gfile):
         dqmc.ggeom_setgeomfile(gfile)
 
+    def setNumThreads(self, nthreads):
+        dqmc.ggeom_setnumthreads(nthreads)
+
     def setMinLFactor(self, minLFactor):
         self.__minLFactor = minLFactor
 

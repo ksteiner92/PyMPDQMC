@@ -90,6 +90,9 @@ for arg in args:
     if "minLFactor" in conf:
         jobargs["minLFactor"] = conf["minLFactor"]
 
+    if "np" in conf:
+        jobargs["np"] = conf["np"]
+
     #Generate input file, pre-input file and logfile directories
     if ("logdir" in conf):
         logdir = os.path.abspath(os.path.join(casedir, conf["logdir"]))

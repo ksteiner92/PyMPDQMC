@@ -97,6 +97,9 @@ if __name__ == '__main__':
     if "minLFactor" in input:
         dqmchandle.setMinLFactor(int(input["minLFactor"]))
 
+    if "np" in input:
+        dqmchandle.setNumThreads(int(input["np"]))
+
     #set temperature
     ################
     dtaumax = input["dtaumax"]

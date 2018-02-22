@@ -73,8 +73,8 @@ module DQMC_Cfg
        &  "reject ", &    ! rejection counts                                     
        &  "seed   ", &    ! random seed                                          
        &  "ssxx   ", &    ! use iterative refinement during sweep
-       &  "t_dn   ", &    ! parameter for kinetic energy                         
        &  "t_up   ", &    ! parameter for kinetic energy                         
+       &  "t_dn   ", &    ! parameter for kinetic energy                         
        &  "tausk  ", &    ! frequence of unequal time measurement                
        &  "tdm    "/)     ! compute time dependent measurement
 
@@ -408,6 +408,7 @@ contains
     ! using insertion sort
     do while (stat .ne. STAT_EOF)
        call DQMC_ReadLn(str, IPT, stat)
+
        ! read in a parameter definition 
        if (stat .eq. STAT_NORMAL) then
 
@@ -601,27 +602,27 @@ contains
   !---------------------------------------------------------------------!
 
   subroutine DQMC_Read_Config(cfg)
-      !
-      ! Purpose
-      ! =======
-      !    This subrotine reads in parameters from a config file.
-      !
-      ! Arguments
-      ! =========
-      !
-      type(config), intent(inout)  :: cfg          ! configuration
-      character(len=256)           :: iname
-      integer                      :: status
+    !
+    ! Purpose
+    ! =======
+    !    This subrotine reads in parameters from a config file.
+    !
+    ! Arguments
+    ! =========
+    !
+    type(config), intent(inout)  :: cfg          ! configuration
+    character(len=256)           :: iname
+    integer                      :: status
 
-      ! Fetch input file name from command line
-      call get_command_argument(1, iname, STATUS=status)
-      if (status > 0) then
-          call DQMC_Error("failed to retrieve input file argument", 0)
-      elseif (status == -1) then
-          call DQMC_Error("String 'iname' is too small to hold input file name, recompile me with a larger ifile!", 0)
-      end if
+    ! Fetch input file name from command line
+    call get_command_argument(1, iname, STATUS=status)
+    if (status > 0) then
+      call DQMC_Error("failed to retrieve input file argument", 0)
+    elseif (status == -1) then
+      call DQMC_Error("String 'iname' is too small to hold input file name, recompile me with a larger ifile!", 0)
+    end if
 
-      call DQMC_Read_ConfigFile(cfg, iname)
+    call DQMC_Read_ConfigFile(cfg, iname)
 
   end subroutine DQMC_Read_Config
 
@@ -645,7 +646,7 @@ contains
     real(wp)               :: tmp(alen)          ! for reading t
     type(Param), pointer   :: curr 
     integer, parameter     :: funit = 10
-    character(len=256)     :: iname
+    character(len=60)      :: iname
     integer                :: IPT
 
     ! ... Executable ...
@@ -1021,7 +1022,7 @@ contains
     else
        call DQMC_Error("cannot find parameter "//name, 0)
     end if
-
+  
   end subroutine DQMC_Config_GetR
 
   !---------------------------------------------------------------------!
@@ -1045,9 +1046,9 @@ contains
 
     ! ... Executable ...
     id = DQMC_Find_Param(cfg, name)
-!    write(*,*) "in DQMC_Config_GetPR, id=",id
-!    write(*,*) "in DQMC_Config_GetPR, name=",name
-!    write(*,*) "in DQMC_Config_GetPR, value associated?",associated(value)
+    !write(*,*) "in DQMC_Config_GetPR, id=",id
+    !write(*,*) "in DQMC_Config_GetPR, name=",name
+    !write(*,*) "in DQMC_Config_GetPR, value associated?",associated(value)
     if (id .gt. 0) then
        if (.not.cfg%record(id)%isSet) then
           call DQMC_Warning(name//" wasn't initialized,&
@@ -1093,9 +1094,9 @@ contains
 
     ! ... Executable ...
     id = DQMC_Find_Param(cfg, name)
-!    write(*,*) "in DQMC_Config_GetPI, id=",id
-!    write(*,*) "in DQMC_Config_GetPI, name=",name
-!    write(*,*) "in DQMC_Config_GetPI, value associated?",associated(value)
+    !write(*,*) "in DQMC_Config_GetPI, id=",id
+    !write(*,*) "in DQMC_Config_GetPI, name=",name
+    !write(*,*) "in DQMC_Config_GetPI, value associated?",associated(value)
     if (id .gt. 0) then
        if (.not.cfg%record(id)%isSet) then
           call DQMC_Warning(name//" wasn't initialized, &

@@ -128,7 +128,10 @@ contains
     real*8  :: ktwist(rdim), kpoint(rdim), hop3d(rdim)
     real*8  :: tijup, tijdn, U, twisthop
     logical :: ldum, doeshop
-    character(len=50) :: string
+    ! Set the character length to a generous value len=200. 
+    ! This covers the #HAMILT section of geometry file. 200 words
+    ! should take care of most of the cases.
+    character(len=200) :: string
 
     real*8, pointer :: pos(:,:), tcfg(:)
 
@@ -290,8 +293,9 @@ contains
      integer, pointer :: tneig(:,:),Uneig(:,:),Jneig(:,:)
      integer, pointer :: tsite(:),Usite(:),Jsite(:)
      
-     if(.not.hamilt%constructed) stop 'Hamiltonian needs to be &
-        &constructed before neig can be found'
+     if (.not.hamilt%constructed) then
+       stop 'Hamiltonian needs to be constructed before neig can be found'
+     end if
     
      n=size(hamilt%hopup,1)
 

@@ -63,7 +63,7 @@ contains
     write(*,'(A)') '#PAIR requires #BONDS to be specified in input'
     stop_exe=.true.
    endif
-   if(stop_exe) stop
+   if(stop_exe)stop
   end subroutine analyze_input
 
 end module DQMC_GEOM_PARAM

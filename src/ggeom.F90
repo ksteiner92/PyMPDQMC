@@ -12,6 +12,11 @@ module dqmc
     type(GeomWrap)      :: Gwrap
     integer             :: symmetries_output_file_unit
     integer             :: nmu
+    type(tdm1),pointer  :: ptm(:)
+    type(Gtau),pointer  :: ptau(:)
+    character(len=slen) :: gfile
+    integer             :: nproc
+    logical             :: tformat
 
     interface setParameter
         module procedure setParameterI, setParameterR
@@ -127,29 +132,44 @@ subroutine setUniformU(U)
     Hub%U = U
 end
 
-subroutine setGeomFile(gfile)
-    character(len=slen) :: gfile
-    logical             :: tformat
+subroutine setGeomFile(gfilein)
+    character(len=slen), intent(in) :: gfilein
 
-    !Get general geometry input
-    call CFG_Get(cfg, "gfile", gfile)
-
+    gfile = gfilein
     call DQMC_Geom_Read_Def(Hub%S, gfile, tformat)
     if (.not.tformat) then
         !If free format fill gwrap
-        call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
+        call DQMC_Geom_Fill(Gwrap, gfile, cfg, 6)
         !Transfer info in Hub%S
         call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
     endif
-    call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
-
     call DQMC_Hub_Config(Hub, cfg)
 end
+
+subroutine setNumThreads(numThreads)
+    integer, intent(in) :: numThreads
+    nproc = numThreads
+end
+
+subroutine DQMC_OMP_Init()
+    integer :: nprocmax, OMP_GET_NUM_PROCS
+
+    nprocmax = OMP_GET_NUM_PROCS()
+    if(nproc <= 0) then
+        nproc = nprocmax
+        call OMP_SET_NUM_THREADS(nproc)
+    elseif(nproc .le. nprocmax) then
+            call OMP_SET_NUM_THREADS(nproc)
+    else
+        write(*, "('Invalid number of threads, must be an integer &
+                between 1 and the max number of threads (', i2, ').')") nprocmax
+        stop
+    end if
+end subroutine DQMC_OMP_Init
 
 function init(cfgfile) result(res)
     character(len=256)  :: cfgfile
     character(len=slen) :: gfile
-    logical             :: tformat
     logical             :: res
     integer             :: mu_up_id
 
@@ -178,12 +198,18 @@ function init(cfgfile) result(res)
     mu_up_id = DQMC_Find_Param(cfg, "mu_up")
     nmu = cfg%record(mu_up_id)%ival
     res = .TRUE.
-
+    nproc = -1
 end
 
 subroutine close()
     call DQMC_Hub_Free(Hub)
     call DQMC_Config_Free(cfg)
+    call DQMC_MPI_Final(qmc_sim)
+    ! Clean up the used storage
+    if (nproc > 1) then
+        deallocate(ptm)
+        deallocate(ptau)
+    endif
     close(symmetries_output_file_unit)
 end
 
@@ -235,7 +261,7 @@ end
 function calculateDensity(mu) result(rho)
     real(wp)            :: rho
     real(wp)            :: mu
-    integer             :: nBin, nIter, slice, i, j, k, avg
+    integer             :: nBin, nIter, slice, i, j, k
     real(wp)            :: randn(1)
     real(wp)            :: tmp(2,1)
     real(wp)            :: progress
@@ -253,11 +279,20 @@ function calculateDensity(mu) result(rho)
     rho = 0.0
 
     ! Warmup sweep
-    write(*, *) "doing warmup ..."
-    do i = 1, Hub%nWarm
-        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-    end do
+    if (Hub%HSFtype .eq. 0) then
+        do i = 1, Hub%nWarm
+            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
+            call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+            call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+        end do
+    else if (Hub%HSFtype .eq. 1) then
+        do i = 1, Hub%nWarm
+            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
+            call DQMC_Hub_Sweep_cont(Hub, NO_MEAS0)
+            call DQMC_Hub_Sweep2_cont(Hub, Hub%nTry)
+        end do
+    end if
+
     ! We divide all the measurement into nBin,
     ! each having nPass/nBin pass.
     nBin   = Hub%P0%nBin
@@ -267,10 +302,18 @@ function calculateDensity(mu) result(rho)
     if (nIter > 0) then
         do i = 1, nBin
             do j = 1, nIter
-                do k = 1, Hub%tausk
-                    call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-                    call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-                enddo
+                if (Hub%HSFtype .eq. 0) then
+                    do k = 1, Hub%tausk
+                        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+                        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+                    enddo
+                else if (Hub%HSFtype .eq. 1) then
+                    do k = 1, Hub%nWarm
+                        call DQMC_Hub_Sweep_cont(Hub, NO_MEAS0)
+                        call DQMC_Hub_Sweep2_cont(Hub, Hub%nTry)
+                    end do
+                end if
+
                 ! Fetch a random slice for measurement
                 call ran0(1, randn, Hub%seed)
                 slice = ceiling(randn(1)*Hub%L)
@@ -293,7 +336,7 @@ function calculateDensity(mu) result(rho)
 end
 
 subroutine run()
-    real                :: t1, t2
+    integer             :: t1, t2, rate
     type(tdm1)          :: tm
     type(Gtau)          :: tau
     integer             :: na, nt, nkt, nkg, i, j, k, slice, nhist, comp_tdm
@@ -302,8 +345,13 @@ subroutine run()
     integer             :: OPT
     integer             :: FLD_UNIT, TDM_UNIT
     real(wp)            :: randn(1)
+    logical             :: tformat
 
-    call cpu_time(t1)
+    call system_clock(t1)
+
+    !Setup OpenMP environment
+    call DQMC_OMP_Init()
+    write(*, "('Running the program in ', i2, ' threads.')"), nproc
 
     !Count the number of processors
     call DQMC_MPI_Init(qmc_sim, PLEVEL_1)
@@ -320,111 +368,162 @@ subroutine run()
 
     call DQMC_open_file(adjustl(trim(ofile))//'.geometry','unknown', symmetries_output_file_unit)
 
+    if (.not.tformat) then
+        !If free format fill gwrap
+        call DQMC_Geom_Fill(Gwrap, gfile, cfg, symmetries_output_file_unit)
+        !Transfer info in Hub%S
+        call DQMC_Geom_Init(Gwrap, Hub%S, cfg)
+    endif
+    call DQMC_Geom_Print(Hub%S, symmetries_output_file_unit)
+    call DQMC_Hub_Config(Hub, cfg)
+
     ! Initialize time dependent properties if comp_tdm > 0
     call CFG_Get(cfg, "tdm", comp_tdm)
     if (comp_tdm > 0) then
-     call DQMC_open_file(adjustl(trim(ofile))//'.tdm.out','unknown', TDM_UNIT)
-     call DQMC_Gtau_Init(Hub, tau)
-     call DQMC_TDM1_Init(Hub%L, Hub%dtau, tm, Hub%P0%nbin, Hub%S, Gwrap)
+        call DQMC_open_file(adjustl(trim(ofile))//'.tdm.out','unknown', TDM_UNIT)
+        call DQMC_Gtau_Init(Hub, tau)
+        call DQMC_TDM1_Init(Hub%L, Hub%dtau, tm, Hub%P0%nbin, Hub%S, Gwrap)
+        if (nproc > 1) then
+            write(*,*) "Initializing multi-core working space."
+            allocate(ptau(tau%nb*tau%nb))
+            do i = 1, tau%nb*tau%nb
+                call DQMC_Gtau_Init(Hub, ptau(i))
+            enddo
+            do i = 1, tau%nb * tau%nb
+                ptau(i)%A_up => tau%A_up
+                ptau(i)%A_dn => tau%A_dn
+                ptau(i)%itau_up => tau%itau_up
+                ptau(i)%itau_dn => tau%itau_dn
+                ptau(i)%sgnup => tau%sgnup
+                ptau(i)%sgndn => tau%sgndn
+                ptau(i)%V_up  => tau%V_up
+                ptau(i)%V_dn  => tau%V_dn
+                ptau(i)%B_up  => tau%B_up
+                ptau(i)%B_dn  => tau%B_dn
+            enddo
+            allocate(ptm(tau%nb*tau%nb))
+            do i = 1, tau%nb*tau%nb
+                call DQMC_TDM1_Init(Hub%L, Hub%dtau, ptm(i), Hub%P0%nbin, Hub%S, Gwrap)
+            enddo
+        endif
     endif
 
     ! Warmup sweep
-    do i = 1, Hub%nWarm
-     if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
-     call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-     call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-    end do
+    if (Hub%HSFtype .eq. 0) then
+        do i = 1, Hub%nWarm
+            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
+            call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+            call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+        end do
+    else if (Hub%HSFtype .eq. 1) then
+        do i = 1, Hub%nWarm
+            if (mod(i, 10)==0) write(*,'(A,i6,1x,i3)')' Warmup Sweep, nwrap  : ', i, Hub%G_up%nwrap
+            call DQMC_Hub_Sweep_cont(Hub, NO_MEAS0)
+            call DQMC_Hub_Sweep2_cont(Hub, Hub%nTry)
+        end do
+    end if
 
     ! We divide all the measurement into nBin,
     ! each having nPass/nBin pass.
     nBin   = Hub%P0%nBin
     nIter  = Hub%nPass / Hub%tausk / nBin
     if (nIter > 0) then
-     do i = 1, nBin
-        do j = 1, nIter
-           do k = 1, Hub%tausk
-              call DQMC_Hub_Sweep(Hub, NO_MEAS0)
-              call DQMC_Hub_Sweep2(Hub, Hub%nTry)
-           enddo
+        do i = 1, nBin
+            do j = 1, nIter
+                if (Hub%HSFtype .eq. 0) then
+                    do k = 1, Hub%tausk
+                        call DQMC_Hub_Sweep(Hub, NO_MEAS0)
+                        call DQMC_Hub_Sweep2(Hub, Hub%nTry)
+                    enddo
+                else if (Hub%HSFtype .eq. 1) then
+                    do k = 1, Hub%nWarm
+                        call DQMC_Hub_Sweep_cont(Hub, NO_MEAS0)
+                        call DQMC_Hub_Sweep2_cont(Hub, Hub%nTry)
+                    end do
+                end if
 
-           ! Fetch a random slice for measurement
-           call ran0(1, randn, Hub%seed)
-           slice = ceiling(randn(1)*Hub%L)
-           write(*,'(a,3i6)') ' Measurement Sweep, bin, iter, slice : ', i, j, slice
+                ! Fetch a random slice for measurement
+                call ran0(1, randn, Hub%seed)
+                slice = ceiling(randn(1)*Hub%L)
+                write(*,'(a,3i6)') ' Measurement Sweep, bin, iter, slice : ', i, j, slice
 
-           if (comp_tdm > 0) then
-              ! Compute full Green's function
-              call DQMC_Gtau_LoadA(tau, TAU_UP, slice, Hub%G_up%sgn)
-              call DQMC_Gtau_LoadA(tau, TAU_DN, slice, Hub%G_dn%sgn)
-              ! Measure equal-time properties
-              call DQMC_Hub_FullMeas(Hub, tau%nnb, tau%A_up, tau%A_dn, tau%sgnup, tau%sgndn)
-              ! Measure time-dependent properties
-              call DQMC_TDM1_Meas(tm, tau)
-           else if (comp_tdm == 0) then
-              call DQMC_Hub_Meas(Hub, slice)
-           endif
+                if (comp_tdm > 0) then
+                    ! Compute full Green's function
+                    call DQMC_Gtau_LoadA(tau, TAU_UP, slice, Hub%G_up%sgn)
+                    call DQMC_Gtau_LoadA(tau, TAU_DN, slice, Hub%G_dn%sgn)
+                    ! Measure equal-time properties
+                    call DQMC_Hub_FullMeas(Hub, tau%nnb, tau%A_up, tau%A_dn, tau%sgnup, tau%sgndn)
+                    ! Measure time-dependent properties
+                    if (nproc > 1) then
+                        call DQMC_TDM1_Meas_Para(tm, ptm, tau, ptau)
+                    else
+                        call DQMC_TDM1_Meas(tm, tau)
+                    endif
+                else if (comp_tdm == 0) then
+                    call DQMC_Hub_Meas(Hub, slice)
+                endif
 
-           !Write fields
-           !if (nhist > 0) call DQMC_Hub_Output_HSF(Hub, .false., slice, HSF_output_file_unit)
+                !Write fields
+                !if (nhist > 0) call DQMC_Hub_Output_HSF(Hub, .false., slice, HSF_output_file_unit)
+            end do
+
+            ! Accumulate results for each bin
+            call DQMC_Phy0_Avg(Hub%P0)
+            call DQMC_tdm1_Avg(tm)
+
+
+            if (Hub%meas2) then
+                if(Hub%P2%diagonalize)then
+                    call DQMC_Phy2_Avg(Hub%P2, Hub%S)
+                else
+                    call DQMC_Phy2_Avg(Hub%P2, Hub%S%W)
+                endif
+            end if
+
         end do
-
-        ! Accumulate results for each bin
-        call DQMC_Phy0_Avg(Hub%P0)
-        call DQMC_tdm1_Avg(tm)
-
-
-        if (Hub%meas2) then
-           if(Hub%P2%diagonalize)then
-             call DQMC_Phy2_Avg(Hub%P2, Hub%S)
-           else
-             call DQMC_Phy2_Avg(Hub%P2, Hub%S%W)
-           endif
-        end if
-
-     end do
     endif
 
     !Read configurations from file if no sweep was perfomed
     if (Hub%nWarm + Hub%nPass == 0) then
-     Hub%nMeas = -1
-     call DQMC_count_records(Hub%npass, FLD_UNIT)
-     nIter = Hub%npass / nbin
-     do i = 1, nBin
-        do j = 1, nIter / qmc_sim%aggr_size
-           call DQMC_Hub_Input_HSF(Hub, .false., slice, FLD_UNIT)
-           call DQMC_Hub_Init_Vmat(Hub)
-           if (comp_tdm > 0) then
-              ! Compute full Green's function - if fullg is on -
-              call DQMC_Gtau_LoadA(tau, TAU_UP, slice, Hub%G_up%sgn)
-              call DQMC_Gtau_LoadA(tau, TAU_DN, slice, Hub%G_dn%sgn)
-              ! Measure equal-time properties. Pass gtau in case fullg was computed.
-              call DQMC_Hub_FullMeas(Hub, tau%nb, &
-                 tau%A_up, tau%A_dn, tau%sgnup, tau%sgndn)
-              ! Measure time-dependent properties. Reuses fullg when possible.
-              call DQMC_TDM1_Meas(tm, tau)
-           else if (comp_tdm == 0) then
-              call DQMC_Hub_Meas(Hub, slice)
-           endif
+        Hub%nMeas = -1
+        call DQMC_count_records(Hub%npass, FLD_UNIT)
+        nIter = Hub%npass / nbin
+        do i = 1, nBin
+            do j = 1, nIter / qmc_sim%aggr_size
+                call DQMC_Hub_Input_HSF(Hub, .false., slice, FLD_UNIT)
+                call DQMC_Hub_Init_Vmat(Hub)
+                if (comp_tdm > 0) then
+                    ! Compute full Green's function - if fullg is on -
+                    call DQMC_Gtau_LoadA(tau, TAU_UP, slice, Hub%G_up%sgn)
+                    call DQMC_Gtau_LoadA(tau, TAU_DN, slice, Hub%G_dn%sgn)
+                    ! Measure equal-time properties. Pass gtau in case fullg was computed.
+                    call DQMC_Hub_FullMeas(Hub, tau%nb, &
+                            tau%A_up, tau%A_dn, tau%sgnup, tau%sgndn)
+                    ! Measure time-dependent properties. Reuses fullg when possible.
+                    call DQMC_TDM1_Meas(tm, tau)
+                else if (comp_tdm == 0) then
+                    call DQMC_Hub_Meas(Hub, slice)
+                endif
+            enddo
+            call DQMC_Phy0_Avg(Hub%P0)
+            call DQMC_TDM1_Avg(tm)
+
+            if (Hub%meas2) then
+                if(Hub%P2%diagonalize)then
+                    call DQMC_Phy2_Avg(Hub%P2, Hub%S)
+                else
+                    call DQMC_Phy2_Avg(Hub%P2, Hub%S%W)
+                endif
+            end if
+
         enddo
-        call DQMC_Phy0_Avg(Hub%P0)
-        call DQMC_TDM1_Avg(tm)
-
-        if (Hub%meas2) then
-           if(Hub%P2%diagonalize)then
-             call DQMC_Phy2_Avg(Hub%P2, Hub%S)
-           else
-             call DQMC_Phy2_Avg(Hub%P2, Hub%S%W)
-           endif
-        end if
-
-     enddo
     endif
 
     !Compute average and error
     call DQMC_Phy0_GetErr(Hub%P0)
     call DQMC_TDM1_GetErr(tm)
     if (Hub%meas2) then
-     call DQMC_Phy2_GetErr(Hub%P2)
+        call DQMC_Phy2_GetErr(Hub%P2)
     end if
 
     ! Prepare output file
@@ -447,7 +546,7 @@ subroutine run()
 
     !Compute Fourier transform
     call DQMC_phy0_GetFT(Hub%P0, Hub%S%D, Hub%S%gf_phase, Gwrap%RecipLattice%FourierC, &
-       Gwrap%GammaLattice%FourierC, nkt, nkg, na, nt)
+            Gwrap%GammaLattice%FourierC, nkt, nkg, na, nt)
     call DQMC_Phy0_GetErrFt(Hub%P0)
     call DQMC_Phy0_PrintFT(Hub%P0, na, nkt, nkg, OPT)
 
@@ -460,26 +559,22 @@ subroutine run()
     call DQMC_TDM1_SelfEnergy(tm, tau, TDM_UNIT)
 
     if(Hub%P2%compute)then
-     if(Hub%P2%diagonalize)then
-        !Obtain waves from diagonalization
-        call DQMC_Phy2_GetIrrep(Hub%P2, Hub%S)
-        !Get error for waves
-        call DQMC_Phy2_GetErrIrrep(Hub%P2, Hub%P0%G_fun, Hub%S)
-        !Analyze symmetry of pairing modes
-        call DQMC_Phy2_WaveSymm(Hub%S,Hub%P2,Gwrap%SymmOp)
-        !Print Pairing info
-        call dqmc_phy2_PrintSymm(Hub%S, Hub%P2, OPT)
-     else
-        call dqmc_phy2_print(Hub%P2, Hub%S%wlabel, OPT)
-     endif
+        if(Hub%P2%diagonalize)then
+            !Obtain waves from diagonalization
+            call DQMC_Phy2_GetIrrep(Hub%P2, Hub%S)
+            !Get error for waves
+            call DQMC_Phy2_GetErrIrrep(Hub%P2, Hub%P0%G_fun, Hub%S)
+            !Analyze symmetry of pairing modes
+            call DQMC_Phy2_WaveSymm(Hub%S,Hub%P2,Gwrap%SymmOp)
+            !Print Pairing info
+            call dqmc_phy2_PrintSymm(Hub%S, Hub%P2, OPT)
+        else
+            call dqmc_phy2_print(Hub%P2, Hub%S%wlabel, OPT)
+        endif
     endif
 
-    ! Clean up the used storage
-    call DQMC_TDM1_Free(tm)
-
-    call cpu_time(t2)
-    call DQMC_MPI_Final(qmc_sim)
-    write(STDOUT,*) "Running time:",  t2-t1, "(second)"
+    call system_clock(t2,rate)
+    write(STDOUT,*) "Running time:",  (t2-t1)/REAL(rate), "(second)"
 
 end subroutine run
 
