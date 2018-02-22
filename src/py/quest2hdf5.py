@@ -39,7 +39,11 @@ class QuestOutputParser:
                 raise Exception("Too less columns")
             if line[0] == '=':
                 break
-            x = float(line[:line.index('(') - 1])
+            x = 0.0
+            try:
+                x = float(line[:line.index('(') - 1])
+            except ValueError:
+                continue
             rawValues = re.findall("\((.*?)\)", line)
             valParts = rawValues[0].strip().split('+-')
             valParts.extend(rawValues[1].strip().split('+-'))
