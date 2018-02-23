@@ -646,7 +646,7 @@ contains
     real(wp)               :: tmp(alen)          ! for reading t
     type(Param), pointer   :: curr 
     integer, parameter     :: funit = 10
-    character(len=60)      :: iname
+    character(len=*)       :: iname
     integer                :: IPT
 
     ! ... Executable ...
