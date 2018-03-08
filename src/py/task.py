@@ -95,7 +95,7 @@ if __name__ == '__main__':
         dqmchandle.setChemicalPotential(float(input["mu"]))
 
     if "minLFactor" in input:
-        dqmchandle.setMinLFactor(int(input["minLFactor"]))
+        dqmchandle.setMinLFactor(float(input["minLFactor"]))
 
     if "np" in input:
         dqmchandle.setNumThreads(int(input["np"]))

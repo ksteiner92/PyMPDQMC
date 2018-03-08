@@ -67,7 +67,7 @@ class DQMCHandler:
         north = dqmc.ggeom_getparameteri("north")
         L = int(beta / dtaumax)
         if (L < self.__minLFactor * north):
-            L = self.__minLFactor * north
+            L = int(self.__minLFactor * north)
         elif (L % north) != 0:
             L = (int(L) / int(north)) * north + north
         dtau = beta / float(L)
