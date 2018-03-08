@@ -32,7 +32,18 @@ def genListFromConf(conf):
                 return startx + step * dx
         for i in range(0, nsteps):
             values.append(getNextValue(i))
-        prec = max(str(startx)[::-1].find('.'), str(endx)[::-1].find('.'))
+        for value in values:
+            valueStr = "{:.9f}".format(value)
+            offset = valueStr.find('.')
+            for value2 in values:
+                if value == value2:
+                    continue
+                value2Str = "{:.9f}".format(value2) + 1
+                offset2 = value2Str.find('.') + 1
+                for i in range(0, 9):
+                    if valueStr[offset + i] != value2Str[offset2 + i]:
+                        prec = max(prec, i + 1)
+                        break
     return values, prec
 
 parser = optparse.OptionParser(usage = "%prog <input>")
