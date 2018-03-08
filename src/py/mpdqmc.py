@@ -34,11 +34,11 @@ def genListFromConf(conf):
             values.append(getNextValue(i))
         for value in values:
             valueStr = "{:.9f}".format(value)
-            offset = valueStr.find('.')
+            offset = valueStr.find('.') + 1
             for value2 in values:
                 if value == value2:
                     continue
-                value2Str = "{:.9f}".format(value2) + 1
+                value2Str = "{:.9f}".format(value2)
                 offset2 = value2Str.find('.') + 1
                 for i in range(0, 9):
                     if valueStr[offset + i] != value2Str[offset2 + i]:
