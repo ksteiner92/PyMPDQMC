@@ -330,9 +330,7 @@ function calculateDensity(mu) result(rho)
     endif
 
     call DQMC_Phy0_GetErr(Hub%P0)
-    tmp = Hub%P0%meas(:,Hub%P0%avg:Hub%P0%avg)
-    !and here is our density
-    rho = (tmp(1, 1) + tmp(2, 1))
+    rho = Hub%P0%meas(P0_DENSITY, Hub%P0%avg)
 end
 
 subroutine run()
