@@ -45,7 +45,7 @@ module DQMC_TDM1
   end type tdmarray
 
   ! Index of the array varaiables
-  integer, parameter  :: NTDMARRAY = 8
+  integer, parameter  :: NTDMARRAY = 10
   integer, parameter  :: IGFUN = 1
   integer, parameter  :: IGFUP = 2
   integer, parameter  :: IGFDN = 3
@@ -54,6 +54,8 @@ module DQMC_TDM1
   integer, parameter  :: IDENS = 6
   integer, parameter  :: IPAIR = 7
   integer, parameter  :: ICOND = 8
+  integer, parameter  :: IFSUP = 9
+  integer, parameter  :: IFSDN = 10
 
   ! Index of the array varaiables
   character(len=12), parameter :: &
@@ -65,7 +67,9 @@ module DQMC_TDM1
                   "SzSz        ", &
                   "Den-Den     ", &
                   "S-wave      ", &
-                  "Conductivity" /)
+                  "Conductivity", &
+                  "FCorr-SelfEn up", &
+                  "FCorr-SelfEn dn"/)
 
   type TDM1
      integer  :: L
@@ -245,6 +249,23 @@ contains
           T1%properties(iprop)%clabel  => S%clabel
           allocate(T1%properties(iprop)%values(nclass,0:T1%L-1,T1%err))
           allocate(T1%properties(iprop)%valuesk(nk*npp,0:T1%L-1,T1%err))
+
+       case(IFSUP, IFSDN)
+          nclass = S%nClass**3
+
+          nullify(T1%properties(iprop)%tlink)
+          T1%properties(iprop)%n      =  S%nSite
+          T1%properties(iprop)%nclass =  nclass
+          T1%properties(iprop)%D      => S%D
+          T1%properties(iprop)%F      => S%F
+          T1%properties(iprop)%nk     =  Gwrap%GammaLattice%nclass_k
+          T1%properties(iprop)%np     =  Gwrap%lattice%natom
+          nullify(T1%properties(iprop)%ftk)
+          T1%properties(iprop)%ftw    => T1%ftwbos
+          T1%properties(iprop)%phase  => S%chi_phase
+          T1%properties(iprop)%clabel  => S%clabel
+          allocate(T1%properties(iprop)%values(nclass,0:T1%L-1,T1%err))
+          nullify(T1%properties(iprop)%valuesk)
 
        case(ICOND)
 
@@ -558,6 +579,22 @@ contains
 
   end subroutine DQMC_TDM1_Meas_Para
 
+  function DQMC_TDM1_GetUniqueIndexOfTuple(dims, pos, n) result(idx)
+      integer       :: dims(:), pos(:)
+      integer       :: i, j, n
+      integer       :: idx, offset
+
+      idx = 0
+      do i = 1, n
+        offset = 1
+        do j = i + 1, n
+            offset = offset * dims[j]
+        end do
+        idx = idx + offset * pos[i]
+      end do
+
+  end function DQMC_TDM1_GetUniqueIndexOfTuple
+
   !--------------------------------------------------------------------!
 
   subroutine DQMC_TDM1_Compute(T1, upt0, up0t, dnt0, dn0t, up00, uptt, dn00, dntt, it, i0)
@@ -579,7 +616,8 @@ contains
 
     ! ... Local scalar ...
 
-    integer  :: i, j, k, dt, dt1, dt2
+    integer  :: i, j, a, b, k, dt, dt1, dt2
+    integer  :: pos(3), dims(3)
     real(wp), pointer :: value1(:)
     real(wp), pointer :: value2(:)
     real(wp) :: factor
@@ -696,6 +734,26 @@ contains
              value2(k)  = value2(k) + (upt0(j,i)*dnt0(j,i) &
                   + dn0t(i,j)*up0t(i,j))/2
           end do
+       end do
+
+       dims(:) = T1%properties(IFSUP)%nclass
+       value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
+       value2  => T1%properties(IFSUP)%values(:, dt2, T1%tmp)
+       do a = 1,  T1%properties(IFSUP)%n
+           do b = 1,  T1%properties(IFSUP)%n
+               pos(1) = T1%properties(IFSUP)%D(a,b)
+               do j = 1,  T1%properties(IFSUP)%n
+                   ! k is the distance index of site i and site j
+                   pos(2) = T1%properties(IFSUP)%D(j,a)
+                   pos(3) = T1%properties(IFSUP)%D(j,b)
+                   k = DQMC_TDM1_GetUniqueIndexOfTuple(dims, pos, 3)
+                   value1(k)  = value1(k) + (upt0(i,j)*dnt0(i,j) &
+                           + dn0t(j,i)*up0t(j,i))/2
+                   value2(k)  = value2(k) + (upt0(j,i)*dnt0(j,i) &
+                           + dn0t(i,j)*up0t(i,j))/2
+
+               end do
+           end do
        end do
 
        ! Uniform (q=0) current structure factor. This quantity can be used to get approximated dc conductivity.
@@ -843,6 +901,20 @@ contains
              value1(k)  = value1(k) + upt0(i,j)*dnt0(i,j) &
                   + dn0t(j,i)*up0t(j,i)
           end do
+       end do
+
+       value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
+       do a = 1,  T1%properties(IFSUP)%n
+           do b = 1,  T1%properties(IFSUP)%n
+               k = T1%properties(IFSUP)%D(a,b)
+               do j = 1,  T1%properties(IFSUP)%n
+                   ! k is the distance index of site i and site j
+                   ka = T1%properties(IFSUP)%D(j,a)
+                   kb = T1%properties(IFSUP)%D(j,b)
+                   value1(k)  = value1(k) + (upt0(i,j)*dnt0(i,j) &
+                           + dn0t(j,i)*up0t(j,i))/2
+               end do
+           end do
        end do
 
        value1  => T1%properties(ICOND)%values(:, dt1, T1%tmp)
