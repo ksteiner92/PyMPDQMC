@@ -554,7 +554,7 @@ subroutine run()
     call DQMC_TDM1_PrintKFT(tm, TDM_UNIT)
 
     !Compute and print the self-energy
-    call DQMC_TDM1_SelfEnergy(tm, tau, TDM_UNIT)
+    call DQMC_TDM1_ImprovedSelfEnergy(tm, tau, TDM_UNIT)
 
     if(Hub%P2%compute)then
         if(Hub%P2%diagonalize)then
