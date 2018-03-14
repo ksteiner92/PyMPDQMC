@@ -746,10 +746,14 @@ contains
                    !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
                    !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
                    !        (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b)))
-                   value1(k)  = value1(k) + 0.5_wp * &
-                           (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
-                   value2(k)  = value2(k) + 0.5_wp * &
-                           (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b))
+                   !value1(k)  = value1(k) + 0.5_wp * &
+                   !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
+                   !value2(k)  = value2(k) + 0.5_wp * &
+                   !        (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b))
+                   value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-upt0(a,b) + upt0(a,b) * up00(j,j)))
+                   value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-up0t(a,b) + up0t(a,b) * uptt(j,j)))
                end do
            end do
        end do
@@ -780,10 +784,14 @@ contains
                    !        (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b)))
                    !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
                    !        (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b)))
-                   value1(k)  = value1(k) +  0.5_wp * &
-                           (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b))
-                   value2(k)  = value2(k) + 0.5_wp * &
-                           (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b))
+                   !value1(k)  = value1(k) +  0.5_wp * &
+                   !        (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b))
+                   !value2(k)  = value2(k) + 0.5_wp * &
+                   !        (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b))
+                   value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
+                   value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-dn0t(a,b) + dn0t(a,b) * dntt(j,j)))
                end do
            end do
        end do
@@ -943,7 +951,9 @@ contains
                do j = 1,  T1%properties(IFSUP)%n
                    !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
                    !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
-                   value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
+                   !value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
+                   value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-upt0(a,b) + upt0(a,b) * up00(j,j)))
                end do
            end do
        end do
@@ -956,7 +966,9 @@ contains
                do j = 1,  T1%properties(IFSDN)%n
                    !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
                    !        (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b)))
-                   value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b))
+                   !value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b))
+                   value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                           (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
                end do
            end do
        end do
