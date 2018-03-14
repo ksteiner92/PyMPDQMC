@@ -251,13 +251,13 @@ contains
           allocate(T1%properties(iprop)%valuesk(nk*npp,0:T1%L-1,T1%err))
 
        case(IFSUP, IFSDN)
-          nclass = S%nClass
+          nclass = S%nClass**3
 
           T1%properties(iprop)%n      =  S%nSite
           T1%properties(iprop)%nclass =  nclass
           T1%properties(iprop)%D      => S%D
           T1%properties(iprop)%F      => S%F
-          T1%properties(iprop)%nk     =  Gwrap%GammaLattice%nclass_k
+          T1%properties(iprop)%nk     =  S%nClass
           T1%properties(iprop)%np     =  Gwrap%lattice%natom
           nullify(T1%properties(iprop)%ftk)
           !Reuse tlink for storing the hubbard U's
@@ -582,6 +582,25 @@ contains
 
   !--------------------------------------------------------------------!
 
+  function DQMC_TDM1_GetUniqueIndexOfTuple(tuple, dims, n) result(idx)
+    integer     :: tuple(:)
+    integer     :: dims(:)
+    integer     :: n
+    integer     :: idx, i, j, offset
+
+    idx = 0;
+    do i = 1, n
+        offset = 1
+        do j = i + 1, n
+            offset = offset * dims(j)
+        end do
+        idx = idx + offset * tuple(i)
+    end do
+
+  end function DQMC_TDM1_GetUniqueIndexOfTuple
+
+  !--------------------------------------------------------------------!
+
   subroutine DQMC_TDM1_Compute(T1, upt0, up0t, dnt0, dn0t, up00, uptt, dn00, dntt, it, i0)
     !
     ! Purpose
@@ -607,7 +626,8 @@ contains
     real(wp) :: factor
 
     integer :: nsite, ic, jc, l1s, l1e, l2s, l2e
-    real(wp) :: tl1up2up, tl1dn2dn, tl1up2dn, tl1dn2up, dxl1, dxl2, dxl1l2, dab, daj, dbj
+    real(wp) :: tl1up2up, tl1dn2dn, tl1up2dn, tl1dn2up, dxl1, dxl2, dxl1l2
+    integer  :: dims(3), indices(3)
 
     ! ... Executable ...
     if (.not.T1%compute) return
@@ -722,76 +742,56 @@ contains
 
        value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
        value2  => T1%properties(IFSUP)%values(:, dt2, T1%tmp)
+       dims(1:3) = T1%properties(IFSUP)%nk
        do a = 1,  T1%properties(IFSUP)%n
+           indices(1) = a
            do b = 1,  T1%properties(IFSUP)%n
                ! k is the distance index of site a and site b
-               k = T1%properties(IFSUP)%D(a,b)
-               if (a .eq. b) then
-                   dab = 1.0
-               else
-                   dab = 0.0
-               end if
+               !k = T1%properties(IFSUP)%D(a,b)
+               indices(2) = b
                do j = 1,  T1%properties(IFSUP)%n
-                   if (a .eq. j) then
-                       daj = 1.0
-                   else
-                       daj = 0.0
-                   end if
-                   if (b .eq. j) then
-                       dbj = 1.0
-                   else
-                       dbj = 0.0
-                   end if
                    !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
                    !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
                    !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
                    !        (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b)))
-                   !value1(k)  = value1(k) + 0.5_wp * &
-                   !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
-                   !value2(k)  = value2(k) + 0.5_wp * &
-                   !        (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b))
-                   value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-upt0(a,b) + upt0(a,b) * up00(j,j)))
-                   value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-up0t(a,b) + up0t(a,b) * uptt(j,j)))
+                   indices(3) = j
+                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
+                   value1(k)  = value1(k) + 0.5_wp * &
+                           (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
+                   value2(k)  = value2(k) + 0.5_wp * &
+                           (up0t(a,b) * uptt(j,j) - up0t(a,j) * uptt(j,b))
+                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-upt0(a,b) + upt0(a,b) * up00(j,j)))
+                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-upt0(b,a) + upt0(b,a) * up00(j,j)))
                end do
            end do
        end do
 
        value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
        value2  => T1%properties(IFSDN)%values(:, dt2, T1%tmp)
+       dims(1:3) = T1%properties(IFSUP)%nk
        do a = 1,  T1%properties(IFSDN)%n
+           indices(1) = a
            do b = 1,  T1%properties(IFSDN)%n
                ! k is the distance index of site a and site b
-               k = T1%properties(IFSDN)%D(a,b)
-               if (a .eq. b) then
-                   dab = 1.0
-               else
-                   dab = 0.0
-               end if
+               !k = T1%properties(IFSDN)%D(a,b)
+               indices(2) = b
                do j = 1,  T1%properties(IFSDN)%n
-                   if (a .eq. j) then
-                       daj = 1.0
-                   else
-                       daj = 0.0
-                   end if
-                   if (b .eq. j) then
-                       dbj = 1.0
-                   else
-                       dbj = 0.0
-                   end if
                    !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
                    !        (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b)))
                    !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
                    !        (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b)))
-                   !value1(k)  = value1(k) +  0.5_wp * &
-                   !        (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b))
-                   !value2(k)  = value2(k) + 0.5_wp * &
-                   !        (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b))
-                   value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
-                   value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-dn0t(a,b) + dn0t(a,b) * dntt(j,j)))
+                   indices(3) = j
+                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
+                   value1(k)  = value1(k) +  0.5_wp * &
+                           (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b))
+                   value2(k)  = value2(k) + 0.5_wp * &
+                           (dn0t(a,b) * dntt(j,j) - dn0t(a,j) * dntt(j,b))
+                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
+                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-dnt0(b,a) + dnt0(b,a) * dn00(j,j)))
                end do
            end do
        end do
@@ -944,31 +944,41 @@ contains
        end do
 
        value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
+       dims(1:3) = T1%properties(IFSUP)%nk
        do a = 1,  T1%properties(IFSUP)%n
+           indices(1) = a
            do b = 1,  T1%properties(IFSUP)%n
                ! k is the distance index of site a and site b
-               k = T1%properties(IFSUP)%D(a,b)
+               !k = T1%properties(IFSUP)%D(a,b)
+               indices(2) = b
                do j = 1,  T1%properties(IFSUP)%n
                    !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
                    !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
-                   !value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
-                   value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-upt0(a,b) + upt0(a,b) * up00(j,j)))
+                   indices(3) = j
+                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
+                   value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
+                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-upt0(a,b) + upt0(a,b) * up00(j,j)))
                end do
            end do
        end do
 
        value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
+       dims(1:3) = T1%properties(IFSUP)%nk
        do a = 1,  T1%properties(IFSDN)%n
+           indices(1) = a
            do b = 1,  T1%properties(IFSDN)%n
                ! k is the distance index of site a and site b
-               k = T1%properties(IFSDN)%D(a,b)
+               !k = T1%properties(IFSDN)%D(a,b)
+               indices(2) = b
                do j = 1,  T1%properties(IFSDN)%n
                    !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
                    !        (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b)))
-                   !value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b))
-                   value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                           (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
+                   indices(3) = j
+                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
+                   value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b))
+                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                   !        (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
                end do
            end do
        end do
@@ -1385,7 +1395,7 @@ contains
     type(gtau), intent(inout) :: tau
     integer, intent(in)       :: OPT
 
-    integer :: L, n, i, j, nclass
+    integer :: L, n, a, b, i, j, ab, nclass, indices(3), dims(3)
     complex(wp), allocatable :: work(:)
     complex(wp), allocatable :: G(:,:), GS(:,:), S(:,:)
     integer, allocatable     :: ipiv(:)
@@ -1396,38 +1406,61 @@ contains
 
     L      =  T1%L
     n     =  T1%properties(IGFUN)%n
-    nclass = T1%properties(IFSUP)%nClass
+    nclass = T1%properties(IFSUP)%nk
 
     allocate(work(n))
     allocate(ipiv(n))
     allocate(G(n,n))
     allocate(GS(n,n))
-    allocate(S(L,nclass))
+    allocate(S(0:L-1, nclass))
 
+    dims(1:3) = nclass
     do t = 0, L - 1
-       write(label(t),'(f15.8)') j * T1%dtau
+        write(label(t + 1),'(f15.8)') t * T1%dtau
+        S(t,:) = 0.0
+        do a = 1, n
+            do b = 1, n
+                indices(2) = b
+                ab = T1%properties(IGFUP)%D(a,b)
+                do i = 1, n
+                    indices(1) = i
+                    do j = 1, n
+                        indices(3) = j
+                        S(t,ab) = S(t,ab) + 0.5_wp * (T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+                                T1%properties(IFSUP)%values(DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3), t, T1%avg) / &
+                                T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(a,i), t, T1%avg)
+                    end do
+                end do
+            end do
+        end do
+    end do
+
+    !do t = 0, L - 1
+    !   write(label(t + 1),'(f15.8)') t * T1%dtau
        ! Fill matrix. Note that G is complex symmetric. Not hermitian.
-       do i = 1, n
-           do j = 1, n
-               G(i,j) = T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(i,j), t, T1%avg)
-               GS(i,j) = T1%properties(IFSUP)%values(T1%properties(IFSUP)%D(i,j), t, T1%avg)
-           end do
-       end do
+    !   do i = 1, n
+    !       do j = 1, n
+    !           G(i,j) = T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(i,j), t, T1%avg)
+    !           GS(i,j) = T1%properties(IFSUP)%values(T1%properties(IFSUP)%D(i,j), t, T1%avg)
+    !       end do
+    !   end do
        ! solve the linear equation system G*Sigma = B, where G is the Green's function
        ! Sigma the self energy matrix and B GSigma calculated through the correlation
        ! function F = -<T c_a(tau)c^+_b(tau')c^+_j(tau')c_j(tau') >
-       call zgetrf(n, n, G, n, ipiv, info)
-       call zgetrs('N', n, n, G, n, ipiv, GS, n, info)
-       do i = 1, n
-           do j = 1, n
-               S(t,T1%properties(IGFUP)%D(i,j)) = GS(i,j)
-           end do
-       end do
-    enddo
+    !   call zgetrf(n, n, G(1:n,1:n), n, ipiv(1:n), info)
+    !   call zgetrs('N', n, n, G(1:n,1:n), n, ipiv(1:n), GS(1:n, 1:n), n, info)
+    !   S(t,:) = 0.0
+    !   do i = 1, n
+    !       do j = 1, n
+    !           S(t,T1%properties(IGFUP)%D(i,j)) = GS(i,j)
+    !       end do
+    !   end do
+    !enddo
 
     do i = 1, nclass
         do j = 0, L - 1
-            tmp(j+1, 1:2) = S(j, i)
+            tmp(j+1,1) = S(j, i)
+            tmp(j+1,2) = 0.0
         enddo
         title = "SelfEnergy up "//trim(adjustl(T1%properties(IFSUP)%clabel(i)))
         call DQMC_Print_Array(0, L , title, label, tmp(:, 1:1), tmp(:, 2:2), OPT)
