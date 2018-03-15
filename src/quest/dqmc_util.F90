@@ -49,7 +49,16 @@ module DQMC_Util
   integer, parameter :: DLARNV_UNI_N1_1 = 2
   integer, parameter :: DLARNV_NORMAL   = 3
 
+  type IndexList
+      integer :: i, j
+      integer :: n
+      type(IndexList), pointer :: next => null()
+      type(IndexList), pointer :: last => null()
+  end type IndexList
 
+  type IndexListPtr
+      type(IndexList), pointer :: ptr
+  end type IndexListPtr
  
   interface conjg
      module procedure conjg_real, conjg_real1, conjg_real2
