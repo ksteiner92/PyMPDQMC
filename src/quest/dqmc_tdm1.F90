@@ -1368,6 +1368,9 @@ contains
     enddo
 
     do iprop = 1, NTDMARRAY
+       if (iprop .eq. IFSUP .or. iprop .eq. IFSDN) then
+          cycle
+       end if
        do i = 1, T1%properties(iprop)%nclass
           do j = 0, T1%L-1
              tmp(j+1, 1:2) = T1%properties(iprop)%values(i, j, T1%avg:T1%err)
