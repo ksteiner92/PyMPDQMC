@@ -788,8 +788,7 @@ contains
                                     value2(b)  = value2(b) + 0.5_wp * &
                                             (up0t(i,j) * uptt(a,a) - up0t(i,a) * uptt(a,j))
                                 else
-                                    value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) &
-                                            - upt0(a,j) * up00(j,b))
+                                    value1(b)  = value1(b) + (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
                                 end if
                             end do
                         case (IFSDN)
@@ -805,8 +804,7 @@ contains
                                     value2(b)  = value2(b) + 0.5_wp * &
                                             (dn0t(i,j) * dntt(a,a) - dn0t(i,a) * dntt(a,j))
                                 else
-                                    value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) &
-                                            - dnt0(a,j) * dn00(j,b))
+                                    value1(b)  = value1(b) + (dnt0(i,j) * dn00(a,a) - dnt0(i,a) * dn00(a,j))
                                 end if
                             end do
                 end select
