@@ -256,7 +256,8 @@ contains
           T1%properties(iprop)%n      =  S%nSite
           T1%properties(iprop)%nclass =  nclass
           T1%properties(iprop)%D      => S%D
-          T1%properties(iprop)%F      => S%F
+          allocate(T1%properties(iprop)%F(nclass))
+          T1%properties(iprop)%F = 1
           T1%properties(iprop)%nk     =  S%nClass
           T1%properties(iprop)%np     =  Gwrap%lattice%natom
           nullify(T1%properties(iprop)%ftk)
@@ -770,7 +771,7 @@ contains
 
        value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
        value2  => T1%properties(IFSDN)%values(:, dt2, T1%tmp)
-       dims(1:3) = T1%properties(IFSUP)%nk
+       dims(1:3) = T1%properties(IFSDN)%nk
        do a = 1,  T1%properties(IFSDN)%n
            indices(1) = a
            do b = 1,  T1%properties(IFSDN)%n
@@ -964,7 +965,7 @@ contains
        end do
 
        value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
-       dims(1:3) = T1%properties(IFSUP)%nk
+       dims(1:3) = T1%properties(IFSDN)%nk
        do a = 1,  T1%properties(IFSDN)%n
            indices(1) = a
            do b = 1,  T1%properties(IFSDN)%n
