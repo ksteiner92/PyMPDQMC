@@ -395,14 +395,15 @@ contains
 
     do i = 1, size(T1%classToIdxPair)
         current => T1%classToIdxPair(i)%ptr
+        if (.not. associated(current)) exit
         next => current%next
+        if (.not. associated(next)) exit
         do
             deallocate(current)
             if (.not. associated(next)) exit
             current => next
             next => current%next
         enddo
-        deallocate(T1%classToIdxPair(i)%ptr)
     end do
     deallocate(T1%classToIdxPair)
 
@@ -685,7 +686,7 @@ contains
     nclass = size(T1%classToIdxPair)
     dims(1:3) = T1%properties(IFSDN)%nk
 
-    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(next, i, j, value1, value2, indices, a, b)
+    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(next, i, j, value1, value2, indices, a, b, iprop)
     do k = 1, nclass
         do iprop = 1, NTDMARRAY
             value1  => T1%properties(iprop)%values(:, dt1, T1%tmp)
@@ -1252,7 +1253,7 @@ contains
             y, sgn, sum_sgn)
 
        do iprop = 1, NTDMARRAY
-          !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(j, data, average, error)
+          !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(j, data, average, error), FIRSTPRIVATE(y)
           do i = 1, T1%properties(iprop)%nClass
              do j = 0, T1%L-1
                 data =  T1%properties(iprop)%values(i, j, 1:n)
