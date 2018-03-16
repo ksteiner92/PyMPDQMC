@@ -57,7 +57,7 @@ module DQMC_Util
   end type IndexList
 
   type IndexListPtr
-      type(IndexList), pointer :: ptr
+      type(IndexList), pointer :: ptr => null()
   end type IndexListPtr
  
   interface conjg
