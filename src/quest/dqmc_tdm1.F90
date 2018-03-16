@@ -288,14 +288,14 @@ contains
           allocate(T1%properties(iprop)%valuesk(nk*npp,0:T1%L-1,T1%err))
 
        case(IFSUP, IFSDN)
-          nclass = S%nClass**3
+          !nclass = S%nClass**3
 
           T1%properties(iprop)%n      =  S%nSite
-          T1%properties(iprop)%nclass =  nclass
+          T1%properties(iprop)%nclass =  S%nSite**3
           T1%properties(iprop)%D      => S%D
-          allocate(T1%properties(iprop)%F(nclass))
+          allocate(T1%properties(iprop)%F(S%nSite**3))
           T1%properties(iprop)%F = 1
-          T1%properties(iprop)%nk     =  S%nClass
+          T1%properties(iprop)%nk     =  S%nclass
           T1%properties(iprop)%np     =  Gwrap%lattice%natom
           nullify(T1%properties(iprop)%ftk)
           !Reuse tlink for storing the hubbard U's
@@ -303,7 +303,7 @@ contains
           T1%properties(iprop)%ftw    => T1%ftwbos
           T1%properties(iprop)%phase  => S%chi_phase
           T1%properties(iprop)%clabel  => S%clabel
-          allocate(T1%properties(iprop)%values(nclass,0:T1%L-1,T1%err))
+          allocate(T1%properties(iprop)%values(S%nSite**3,0:T1%L-1,T1%err))
           nullify(T1%properties(iprop)%valuesk)
 
        case(ICOND)
@@ -397,11 +397,11 @@ contains
         current => T1%classToIdxPair(i)%ptr
         if (.not. associated(current)) exit
         next => current%next
-        if (.not. associated(next)) exit
         do
             deallocate(current)
             if (.not. associated(next)) exit
             current => next
+            if (.not. associated(current)) exit
             next => current%next
         enddo
     end do
@@ -509,12 +509,14 @@ contains
     sgn = tau%sgnup * tau%sgndn
     do iprop = 1, NTDMARRAY
        values => T1%properties(iprop)%values
-       do it = 0, L-1
-          do i = 1, T1%properties(iprop)%nClass
+       !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(it, factor)
+       do i = 1, T1%properties(iprop)%nClass
+           do it = 0, L-1
              factor = sgn/(T1%properties(iprop)%F(i)*cnt)
              values(i,it,T1%idx)   = values(i,it,T1%idx)   + factor*values(i,it,T1%tmp)
-          end do
+           end do
        end do
+       !$OMP END PARALLEL DO
        values(:,:,T1%tmp)   = ZERO
     enddo
 
@@ -761,7 +763,7 @@ contains
                         case (IFSUP)
                             indices(1) = i
                             indices(2) = j
-                            dims(1:3) = T1%properties(IFSUP)%nk
+                            dims(1:3) = T1%properties(IFSUP)%n
                             do a = 1,  T1%properties(IFSUP)%n
                                 indices(3) = a
                                 b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
@@ -777,6 +779,7 @@ contains
                         case (IFSDN)
                             indices(1) = i
                             indices(2) = j
+                            dims(1:3) = T1%properties(IFSUP)%n
                             do a = 1,  T1%properties(IFSDN)%n
                                 indices(3) = a
                                 b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
