@@ -633,25 +633,6 @@ contains
 
   !--------------------------------------------------------------------!
 
-  function DQMC_TDM1_GetUniqueIndexOfTuple(tuple, dims, n) result(idx)
-    integer     :: tuple(:)
-    integer     :: dims(:)
-    integer     :: n
-    integer     :: idx, i, j, offset
-
-    idx = 0;
-    do i = 1, n
-        offset = 1
-        do j = i + 1, n
-            offset = offset * dims(j)
-        end do
-        idx = idx + offset * tuple(i)
-    end do
-
-  end function DQMC_TDM1_GetUniqueIndexOfTuple
-
-  !--------------------------------------------------------------------!
-
   subroutine DQMC_TDM1_Compute(T1, upt0, up0t, dnt0, dn0t, up00, uptt, dn00, dntt, it, i0)
     !
     ! Purpose
@@ -1271,6 +1252,7 @@ contains
             y, sgn, sum_sgn)
 
        do iprop = 1, NTDMARRAY
+          !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(j, data, average, error)
           do i = 1, T1%properties(iprop)%nClass
              do j = 0, T1%L-1
                 data =  T1%properties(iprop)%values(i, j, 1:n)
@@ -1279,6 +1261,7 @@ contains
                 T1%properties(iprop)%values(i, j, err) = error
              enddo
           end do
+          !$OMP END PARALLEL DO
        enddo
 
     else

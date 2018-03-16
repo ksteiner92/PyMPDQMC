@@ -1301,4 +1301,22 @@ contains
 
   !--------------------------------------------------------------------!
 
+  function DQMC_TDM1_GetUniqueIndexOfTuple(tuple, dims, n) result(idx)
+    integer     :: tuple(:)
+    integer     :: dims(:)
+    integer     :: n
+    integer     :: idx, i, j, offset
+
+    idx = 0;
+    do i = 1, n
+        offset = 1
+        do j = i + 1, n
+            offset = offset * dims(j)
+        end do
+        idx = idx + offset * tuple(i)
+    end do
+  end function DQMC_TDM1_GetUniqueIndexOfTuple
+
+  !--------------------------------------------------------------------!
+
 end module DQMC_Util
