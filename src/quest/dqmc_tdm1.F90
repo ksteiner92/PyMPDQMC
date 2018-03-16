@@ -82,6 +82,7 @@ module DQMC_TDM1
      integer  :: cnt
 
      type(IndexListPtr), dimension(:), allocatable :: classToIdxPair
+     logical  :: selfen = .false.
 
      logical  :: compute=.false.
 
@@ -97,8 +98,8 @@ module DQMC_TDM1
   
 contains
 
- !--------------------------------------------------------------------!
-  
+  !--------------------------------------------------------------------!
+
   subroutine DQMC_TDM1_Init(L, dtau, T1, nBin, S, Gwrap)
     use DQMC_Geom_Wrap
     !
@@ -175,6 +176,7 @@ contains
     call  DQMC_TDM1_InitFTw(T1)
     allocate(T1%properties(NTDMARRAY))
     do i = 1, NTDMARRAY
+       if ((i .eq. IFSDN .or. i .eq. IFSUP) .and. .not. T1%selfen) cycle
        call DQMC_TDM1_InitProp(T1, S, Gwrap, i)
     enddo
     
@@ -508,6 +510,7 @@ contains
 
     sgn = tau%sgnup * tau%sgndn
     do iprop = 1, NTDMARRAY
+       if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
        values => T1%properties(iprop)%values
        !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(it, factor)
        do i = 1, T1%properties(iprop)%nClass
@@ -604,6 +607,7 @@ contains
     ! Sum up the multi-threads value
     do n = 1, tau%nb * tau%nb
        do iprop = 1, NTDMARRAY
+          if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
           do i = 1, T1%properties(iprop)%nclass
              do it = 0, L-1
                    T1%properties(iprop)%values(i,it,T1%tmp) = T1%properties(iprop)%values(i,it,T1%tmp)+&
@@ -615,6 +619,7 @@ contains
  
     sgn = tau%sgnup * tau%sgndn
     do iprop = 1, NTDMARRAY
+       if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
        values => T1%properties(iprop)%values
        do it = 0, L-1
           do i = 1, T1%properties(iprop)%nClass
@@ -691,6 +696,7 @@ contains
     !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(next, i, j, value1, value2, indices, a, b, iprop)
     do k = 1, nclass
         do iprop = 1, NTDMARRAY
+            if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
             value1  => T1%properties(iprop)%values(:, dt1, T1%tmp)
             value2  => T1%properties(iprop)%values(:, dt2, T1%tmp)
             next => T1%classToIdxPair(k)%ptr
@@ -1212,6 +1218,7 @@ contains
 
     ! Compute average on Green's function
     do i = 1, NTDMARRAY
+       if ((i .eq. IFSDN .or. i .eq. IFSUP) .and. .not. T1%selfen) cycle
        nl = T1%properties(i)%nClass * T1%L
        call dscal(nl, factor, T1%properties(i)%values(:,0,idx), 1)
     enddo
@@ -1256,6 +1263,7 @@ contains
             y, sgn, sum_sgn)
 
        do iprop = 1, NTDMARRAY
+          if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
           !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(j, data, average, error), FIRSTPRIVATE(y)
           do i = 1, T1%properties(iprop)%nClass
              do j = 0, T1%L-1
@@ -1280,6 +1288,7 @@ contains
 
           !Average properties
           do iprop = 1, NTDMARRAY
+             if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
              binptr => T1%properties(iprop)%values(:,:,1)
              aveptr => T1%properties(iprop)%value(:,:,avg)
              n = T1%properties(iprop)%nClass * T1%L
@@ -1289,6 +1298,7 @@ contains
 
           !Compute average over n-1 processors
           do iprop = 1, NTDMARRAY
+             if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
              binptr => T1%properties(iprop)%values(:,:,1)
              aveptr => T1%properties(iprop)%values(:,:,avg)
              binptr = (aveptr - binptr) / dble(nproc - 1)
@@ -1297,6 +1307,7 @@ contains
 
           !Store average amongst all processors
           do iprop = 1, NTDMARRAY
+             if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
              aveptr => T1%properties(iprop)%values(:,:,avg)
              aveptr =  aveptr / T1%sgn(avg) 
           enddo
@@ -1304,12 +1315,14 @@ contains
 
           !Store jackknife in the processor bin
           do iprop = 1, NTDMARRAY
+             if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
              binptr => T1%properties(iprop)%values(:,:,1)
              binptr =  binptr / T1%sgn(1) 
           enddo
 
           !Compute error
           do iprop = 1, NTDMARRAY
+             if ((iprop .eq. IFSDN .or. iprop .eq. IFSUP) .and. .not. T1%selfen) cycle
              binptr => T1%properties(iprop)%values(:,:,1)
              errptr => T1%properties(iprop)%values(:,:,err)
              n = T1%properties(iprop)%nClass * T1%L

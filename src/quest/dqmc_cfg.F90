@@ -33,7 +33,7 @@ module DQMC_Cfg
   integer, parameter :: TYPE_STRING  = 3 
 
   ! default parameters
-  integer, parameter :: N_Param = 40
+  integer, parameter :: N_Param = 41
 
   ! name of parameters
   character(len=*), parameter :: PARAM_NAME(N_Param) =  &
@@ -75,7 +75,8 @@ module DQMC_Cfg
        &  "ssxx   ", &    ! use iterative refinement during sweep
        &  "t_up   ", &    ! parameter for kinetic energy                         
        &  "t_dn   ", &    ! parameter for kinetic energy                         
-       &  "tausk  ", &    ! frequence of unequal time measurement                
+       &  "tausk  ", &    ! frequence of unequal time measurement
+       &  "selfen ", &    ! compute self energy
        &  "tdm    "/)     ! compute time dependent measurement
 
   ! default values
@@ -118,7 +119,8 @@ module DQMC_Cfg
        &  "0       ", &    ! ssxx
        &  "1.0     ", &    ! t_up      
        &  "1.0     ", &    ! t_dn      
-       &  "10      ", &    ! tausk  
+       &  "10      ", &    ! tausk
+       &  "0       ", &    ! selfen
        &  "0       "/)     ! tdm
   
   ! parameter type
@@ -161,7 +163,8 @@ module DQMC_Cfg
        &  TYPE_INTEGER, &    ! ssxx
        &  TYPE_REAL,    &    ! t_up      
        &  TYPE_REAL,    &    ! t_dn      
-       &  TYPE_INTEGER, &    ! tausk  
+       &  TYPE_INTEGER, &    ! tausk
+       &  TYPE_INTEGER, &    ! selfen
        &  TYPE_INTEGER/)     ! tdm
 
   ! is array parameter
@@ -204,7 +207,8 @@ module DQMC_Cfg
        &  .false.,&           ! ssxx      
        &  .true. ,&           ! t_up
        &  .true. ,&           ! t_dn
-       &  .false.,&           ! tausk  
+       &  .false.,&           ! tausk
+       &  .false.,&           ! selfen
        &  .false./)           ! tdm
 
   !

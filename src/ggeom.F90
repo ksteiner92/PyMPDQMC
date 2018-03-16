@@ -340,6 +340,7 @@ subroutine run()
     integer             :: na, nt, nkt, nkg, i, j, k, slice, nhist, comp_tdm
     integer             :: nBin, nIter
     character(len=60)   :: ofile
+    integer             :: selfen
     integer             :: OPT
     integer             :: FLD_UNIT, TDM_UNIT
     real(wp)            :: randn(1)
@@ -359,6 +360,9 @@ subroutine run()
 
     !Save whether to use refinement for G used in measurements.
     call CFG_Get(cfg, "nhist", nhist)
+
+    !Calculate self energy
+    call CFG_Get(cfg, "selfen", selfen)
 
     !if (nhist > 0) then
     !   call DQMC_open_file(adjustl(trim(ofile))//'.HSF.stream','unknown', HSF_output_file_unit)
@@ -381,6 +385,9 @@ subroutine run()
         call DQMC_open_file(adjustl(trim(ofile))//'.tdm.out','unknown', TDM_UNIT)
         call DQMC_Gtau_Init(Hub, tau)
         call DQMC_TDM1_Init(Hub%L, Hub%dtau, tm, Hub%P0%nbin, Hub%S, Gwrap)
+        if (selfen > 0) then
+            tm%selfen = .true.
+        end if
         if (nproc > 1) then
             write(*,*) "Initializing multi-core working space."
             allocate(ptau(tau%nb*tau%nb))
@@ -402,6 +409,9 @@ subroutine run()
             allocate(ptm(tau%nb*tau%nb))
             do i = 1, tau%nb*tau%nb
                 call DQMC_TDM1_Init(Hub%L, Hub%dtau, ptm(i), Hub%P0%nbin, Hub%S, Gwrap)
+                if (selfen > 0) then
+                    ptm(i)%selfen = .true.
+                end if
             enddo
         endif
     endif
