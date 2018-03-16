@@ -702,8 +702,9 @@ contains
     endif
 
     nclass = size(T1%classToIdxPair)
+    dims(1:3) = T1%properties(IFSDN)%nk
 
-    !$OMP PARALLEL DO SCHEDULE(DYNAMIC), PRIVATE(next, i, j, value1, value2)
+    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(next, i, j, value1, value2, indices, a, b)
     do k = 1, nclass
         do iprop = 1, NTDMARRAY
             value1  => T1%properties(iprop)%values(:, dt1, T1%tmp)
@@ -794,7 +795,6 @@ contains
                         case (IFSDN)
                             indices(1) = i
                             indices(2) = j
-                            dims(1:3) = T1%properties(IFSDN)%nk
                             do a = 1,  T1%properties(IFSDN)%n
                                 indices(3) = a
                                 b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
@@ -1368,9 +1368,7 @@ contains
     enddo
 
     do iprop = 1, NTDMARRAY
-       if (iprop .eq. IFSUP .or. iprop .eq. IFSDN) then
-          cycle
-       end if
+       if (iprop .eq. IFSUP .or. iprop .eq. IFSDN) cycle
        do i = 1, T1%properties(iprop)%nclass
           do j = 0, T1%L-1
              tmp(j+1, 1:2) = T1%properties(iprop)%values(i, j, T1%avg:T1%err)
@@ -1566,11 +1564,12 @@ contains
     type(gtau), intent(inout) :: tau
     integer, intent(in)       :: OPT
 
-    integer :: L, n, a, b, i, j, ab, nclass, indices(3), dims(3)
-    complex(wp), allocatable :: work(:)
-    complex(wp), allocatable :: G(:,:), GS(:,:), S(:,:)
-    integer, allocatable     :: ipiv(:)
-    integer     :: t, info
+    integer :: L, n, a, b, i, j, ab, t, nclass, indices(3), dims(3)
+    !complex(wp), allocatable :: work(:)
+    real(wp), allocatable :: S(:,:)
+    !complex(wp), allocatable :: G(:,:), GS(:,:), S(:,:)
+    !integer, allocatable     :: ipiv(:)
+    !integer     :: info
     real(wp)            :: tmp(T1%L, 2)
     character(len=15)   :: label(T1%L)
     character(len=slen) :: title
@@ -1579,20 +1578,22 @@ contains
     n     =  T1%properties(IGFUN)%n
     nclass = T1%properties(IFSUP)%nk
 
-    allocate(work(n))
-    allocate(ipiv(n))
-    allocate(G(n,n))
-    allocate(GS(n,n))
+    !allocate(work(n))
+    !allocate(ipiv(n))
+    !allocate(G(n,n))
+    !allocate(GS(n,n))
     allocate(S(0:L-1, nclass))
 
     dims(1:3) = nclass
+
+    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(a, b, i, j, ab, indices)
     do t = 0, L - 1
         write(label(t + 1),'(f15.8)') t * T1%dtau
         S(t,:) = 0.0
         do a = 1, n
             do b = 1, n
                 indices(2) = b
-                ab = T1%properties(IGFUP)%D(a,b)
+                ab = T1%properties(IFSUP)%D(a,b)
                 do i = 1, n
                     indices(1) = i
                     do j = 1, n
@@ -1605,6 +1606,7 @@ contains
             end do
         end do
     end do
+    !$OMP END PARALLEL DO
 
     !do t = 0, L - 1
     !   write(label(t + 1),'(f15.8)') t * T1%dtau
@@ -1638,10 +1640,10 @@ contains
         write(OPT,'(1x)')
     enddo
 
-    deallocate(work)
-    deallocate(ipiv)
-    deallocate(G)
-    deallocate(GS)
+    !deallocate(work)
+    !deallocate(ipiv)
+    !deallocate(G)
+    !deallocate(GS)
     deallocate(S)
 
   end subroutine DQMC_TDM1_ImprovedSelfEnergy
