@@ -773,13 +773,17 @@ contains
                             do a = 1,  T1%properties(IFSUP)%n
                                 indices(3) = a
                                 b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
+                                write(*,*) i, j, a, b
                                 if (dt .ne. 0) then
                                     value1(b)  = value1(b) + 0.5_wp * &
-                                            (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
+                                            (-upt0(i,j) * (1.0_wp - up00(a,a)))
+                                    !        (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
                                     value2(b)  = value2(b) + 0.5_wp * &
-                                            (up0t(i,j) * uptt(a,a) - up0t(i,a) * uptt(a,j))
+                                            (-up0t(i,j) * (1.0_wp - uptt(a,a)))
+                                    !        (up0t(i,j) * uptt(a,a) - up0t(i,a) * uptt(a,j))
                                 else
-                                    value1(b)  = value1(b) + (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
+                                    value1(b)  = value1(b) + (-upt0(i,j) * (1.0_wp - up00(a,a)))
+                                    !value1(b)  = value1(b) + (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
                                 end if
                             end do
                         case (IFSDN)
@@ -809,151 +813,6 @@ contains
     !$OMP END PARALLEL DO
 
     if (dt .ne. 0) then
-
-!       value1  => T1%properties(IGFUN)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IGFUN)%values(:, dt2, T1%tmp)
-!       do i = 1, T1%properties(IGFUN)%n
-!          do j = 1, T1%properties(IGFUN)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFUN)%D(i,j)
-!             value1(k)  = value1(k) + factor*(upt0(i,j) + dnt0(i,j))
-!             value2(k)  = value2(k) - factor*(up0t(i,j) + dn0t(i,j))
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IGFUP)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IGFUP)%values(:, dt2, T1%tmp)
-!       do i = 1, T1%properties(IGFUP)%n
-!          do j = 1, T1%properties(IGFUP)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFUP)%D(i,j)
-!             value1(k)  = value1(k) + 2*factor*upt0(i,j)
-!             value2(k)  = value2(k) - 2*factor*up0t(i,j)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IGFDN)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IGFDN)%values(:, dt2, T1%tmp)
-!       do i = 1, T1%properties(IGFDN)%n
-!          do j = 1, T1%properties(IGFDN)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFDN)%D(i,j)
-!             value1(k)  = value1(k) + 2*factor*dnt0(i,j)
-!             value2(k)  = value2(k) - 2*factor*dn0t(i,j)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(ISPXX)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(ISPXX)%values(:, dt2, T1%tmp)
-!       do i = 1,  T1%properties(ISPXX)%n
-!          do j = 1,  T1%properties(ISPXX)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(ISPXX)%D(i,j)
-!             value1(k)  = value1(k) - (up0t(j,i)*dnt0(i,j) &
-!                  + dn0t(j,i)*upt0(i,j))/2
-!             value2(k)  = value2(k) - (up0t(i,j)*dnt0(j,i) &
-!                  + dn0t(i,j)*upt0(j,i))/2
-!          end do
-!       end do
-!
-!       value1  => T1%properties(ISPZZ)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(ISPZZ)%values(:, dt2, T1%tmp)
-!       do i = 1, T1%properties(ISPZZ)%n
-!          do j = 1, T1%properties(ISPZZ)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(ISPZZ)%D(i,j)
-!             value1(k)  = value1(k) - (up0t(j,i)*upt0(i,j) &
-!               + dn0t(j,i)*dnt0(i,j) - (uptt(i,i)-dntt(i,i))*(up00(j,j)-dn00(j,j)) )*0.5_wp
-!             value2(k)  = value2(k) - (dn0t(i,j)*dnt0(j,i) &
-!               + up0t(i,j)*upt0(j,i) - (uptt(j,j)-dntt(j,j))*(up00(i,i)-dn00(i,i)) )*0.5_wp
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IDENS)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IDENS)%values(:, dt2, T1%tmp)
-!       do i = 1, T1%properties(IDENS)%n
-!          do j = 1, T1%properties(IDENS)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IDENS)%D(i,j)
-!             value1(k)  = value1(k) - ( up0t(j,i)*upt0(i,j) &
-!               + dn0t(j,i)*dnt0(i,j) - (uptt(i,i)+dntt(i,i))*(up00(j,j)+dn00(j,j)) &
-!               - 2.0_wp*(1.0_wp - uptt(i,i) - up00(j,j) ) &
-!               - 2.0_wp*(1.0_wp - dntt(i,i) - dn00(j,j) ) )*0.5_wp
-!             value2(k)  = value2(k) - (dn0t(i,j)*dnt0(j,i) &
-!               + up0t(i,j)*upt0(j,i) - (uptt(j,j)+dntt(j,j))*(up00(i,i)+dn00(i,i)) &
-!               - 2.0_wp*(1.0_wp - up00(i,i) - uptt(j,j) ) &
-!               - 2.0_wp*(1.0_wp - dn00(i,i) - dntt(j,j) ) )*0.5_wp
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IPAIR)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IPAIR)%values(:, dt2, T1%tmp)
-!       do i = 1,  T1%properties(IPAIR)%n
-!          do j = 1,  T1%properties(IPAIR)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IPAIR)%D(i,j)
-!             value1(k)  = value1(k) + (upt0(i,j)*dnt0(i,j) &
-!                  + dn0t(j,i)*up0t(j,i))/2
-!             value2(k)  = value2(k) + (upt0(j,i)*dnt0(j,i) &
-!                  + dn0t(i,j)*up0t(i,j))/2
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IFSUP)%values(:, dt2, T1%tmp)
-!       dims(1:3) = T1%properties(IFSUP)%nk
-!       do a = 1,  T1%properties(IFSUP)%n
-!           indices(1) = a
-!           do b = 1,  T1%properties(IFSUP)%n
-!               ! k is the distance index of site a and site b
-!               !k = T1%properties(IFSUP)%D(a,b)
-!               indices(2) = b
-!               do j = 1,  T1%properties(IFSUP)%n
-!                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
-!                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (up0t(a,b) * up00(j,j) - up0t(a,j) * up00(j,b)))
-!                   indices(3) = j
-!                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-!                   value1(k)  = value1(k) + 0.5_wp * &
-!                           (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
-!                   value2(k)  = value2(k) + 0.5_wp * &
-!                           (up0t(a,b) * uptt(j,j) - up0t(a,j) * uptt(j,b))
-!                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-upt0(a,b) + upt0(a,b) * up00(j,j)))
-!                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-upt0(b,a) + upt0(b,a) * up00(j,j)))
-!               end do
-!           end do
-!       end do
-!
-!       value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
-!       value2  => T1%properties(IFSDN)%values(:, dt2, T1%tmp)
-!       dims(1:3) = T1%properties(IFSDN)%nk
-!       do a = 1,  T1%properties(IFSDN)%n
-!           indices(1) = a
-!           do b = 1,  T1%properties(IFSDN)%n
-!               ! k is the distance index of site a and site b
-!               !k = T1%properties(IFSDN)%D(a,b)
-!               indices(2) = b
-!               do j = 1,  T1%properties(IFSDN)%n
-!                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
-!                   !        (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b)))
-!                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
-!                   !        (dn0t(a,b) * dn00(j,j) - dn0t(a,j) * dn00(j,b)))
-!                   indices(3) = j
-!                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-!                   value1(k)  = value1(k) +  0.5_wp * &
-!                           (dnt0(a,b) * dn00(j,j)- dnt0(a,j) * dn00(j,b))
-!                   value2(k)  = value2(k) + 0.5_wp * &
-!                           (dn0t(a,b) * dntt(j,j) - dn0t(a,j) * dntt(j,b))
-!                   !value1(k)  = value1(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
-!                   !value2(k)  = value2(k) + 0.25_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-dnt0(b,a) + dnt0(b,a) * dn00(j,j)))
-!               end do
-!           end do
-!       end do
 
        ! Uniform (q=0) current structure factor. This quantity can be used to get approximated dc conductivity.
        value1  => T1%properties(ICOND)%values(:, dt1, T1%tmp)
@@ -1031,117 +890,6 @@ contains
            end do
 
     else
-
-!       value1  => T1%properties(IGFUN)%values(:, dt1, T1%tmp)
-!       do i = 1, T1%properties(IGFUN)%n
-!          do j = 1, T1%properties(IGFUN)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFUN)%D(i,j)
-!             value1(k)  = value1(k) + factor*(upt0(i,j) + dnt0(i,j))
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IGFUP)%values(:, dt1, T1%tmp)
-!       do i = 1, T1%properties(IGFUP)%n
-!          do j = 1, T1%properties(IGFUP)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFUP)%D(i,j)
-!             value1(k)  = value1(k) + 2*factor*upt0(i,j)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IGFDN)%values(:, dt1, T1%tmp)
-!       do i = 1, T1%properties(IGFDN)%n
-!          do j = 1, T1%properties(IGFDN)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IGFDN)%D(i,j)
-!             value1(k)  = value1(k) + 2*factor*dnt0(i,j)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(ISPXX)%values(:, dt1, T1%tmp)
-!       do i = 1,  T1%properties(ISPXX)%n
-!          do j = 1,  T1%properties(ISPXX)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(ISPXX)%D(i,j)
-!             value1(k)  = value1(k) - up0t(j,i)*dnt0(i,j) &
-!                  - dn0t(j,i)*upt0(i,j)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(ISPZZ)%values(:, dt1, T1%tmp)
-!       do i = 1, T1%properties(ISPZZ)%n
-!          do j = 1, T1%properties(ISPZZ)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(ISPZZ)%D(i,j)
-!             value1(k)  = value1(k) - (up0t(j,i)*upt0(i,j) &
-!               + dn0t(j,i)*dnt0(i,j) - (uptt(i,i)-dntt(i,i))*(up00(j,j)-dn00(j,j)) )
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IDENS)%values(:, dt1, T1%tmp)
-!       do i = 1, T1%properties(IDENS)%n
-!          do j = 1, T1%properties(IDENS)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IDENS)%D(i,j)
-!             value1(k)  = value1(k) - ( up0t(j,i)*upt0(i,j) &
-!               + dn0t(j,i)*dnt0(i,j) - (uptt(i,i)+dntt(i,i))*(up00(j,j)+dn00(j,j)) &
-!               - 2.0_wp*(1.0_wp - uptt(i,i) - up00(j,j) ) &
-!               - 2.0_wp*(1.0_wp - dntt(i,i) - dn00(j,j) ) )
-!
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IPAIR)%values(:, dt1, T1%tmp)
-!       do i = 1,  T1%properties(IPAIR)%n
-!          do j = 1,  T1%properties(IPAIR)%n
-!             ! k is the distance index of site i and site j
-!             k = T1%properties(IPAIR)%D(i,j)
-!             value1(k)  = value1(k) + upt0(i,j)*dnt0(i,j) &
-!                  + dn0t(j,i)*up0t(j,i)
-!          end do
-!       end do
-!
-!       value1  => T1%properties(IFSUP)%values(:, dt1, T1%tmp)
-!       dims(1:3) = T1%properties(IFSUP)%nk
-!       do a = 1,  T1%properties(IFSUP)%n
-!           indices(1) = a
-!           do b = 1,  T1%properties(IFSUP)%n
-!               ! k is the distance index of site a and site b
-!               !k = T1%properties(IFSUP)%D(a,b)
-!               indices(2) = b
-!               do j = 1,  T1%properties(IFSUP)%n
-!                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b)))
-!                   indices(3) = j
-!                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-!                   value1(k)  = value1(k) + (upt0(a,b) * up00(j,j) - upt0(a,j) * up00(j,b))
-!                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-upt0(a,b) + upt0(a,b) * up00(j,j)))
-!               end do
-!           end do
-!       end do
-!
-!       value1  => T1%properties(IFSDN)%values(:, dt1, T1%tmp)
-!       dims(1:3) = T1%properties(IFSDN)%nk
-!       do a = 1,  T1%properties(IFSDN)%n
-!           indices(1) = a
-!           do b = 1,  T1%properties(IFSDN)%n
-!               ! k is the distance index of site a and site b
-!               !k = T1%properties(IFSDN)%D(a,b)
-!               indices(2) = b
-!               do j = 1,  T1%properties(IFSDN)%n
-!                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSDN)%tlink(j,b) + T1%properties(IFSDN)%tlink(b,j)) * &
-!                   !        (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b)))
-!                   indices(3) = j
-!                   k = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-!                   value1(k)  = value1(k) + (dnt0(a,b) * dn00(j,j) - dnt0(a,j) * dn00(j,b))
-!                   !value1(k)  = value1(k) + 0.5_wp * ((T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-!                   !        (-dnt0(a,b) + dnt0(a,b) * dn00(j,j)))
-!               end do
-!           end do
-!       end do
-
        value1  => T1%properties(ICOND)%values(:, dt1, T1%tmp)
 
        nsite  = T1%properties(ICOND)%n*T1%properties(ICOND)%nk
