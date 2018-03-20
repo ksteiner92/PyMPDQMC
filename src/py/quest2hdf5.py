@@ -1,7 +1,10 @@
 import sys
 import os
 import pandas as pd
+import numpy as np
 import math
+from scipy import special
+import scipy.integrate as integrate
 from pandas import HDFStore,DataFrame
 import optparse
 import re
@@ -327,11 +330,68 @@ class QuestOutputParser:
 class Extractor:
 
     __projdir = os.getcwd()
+    __N = 2000
+    __L = 100
+    __matsubara = False
 
     def setProjectDir(self, projdir):
         self.__projdir = os.path.abspath(projdir)
 
-    def extract(self, *keys):
+    def setNumLegendre(self, L):
+        self.__L = L
+
+    def setNumFrequencies(self, N):
+        self.__N = N
+
+    def calcMatsubara(self, matsubara):
+        self.__matsubara = matsubara
+
+    def calcGiw(self, frame):
+        G_tau = frame['TDM/Gfun']
+        b = float(frame['PARAM/Float'].query("name=='beta'").value.values[0])
+        rGroups = G_tau.groupby(["rx", "ry", "rz"])
+        allR = [r for r, v in rGroups.groups.items()]
+        for r in allR:
+            print "Calculate Giw for r=(" + str(r[0]) + "," + str(r[1]) + "," + str(r[2]) + ") ..."
+            G_tau_0 = G_tau.query("rx==" + str(r[0]) + " and ry==" + str(r[1]) + " and rz==" + str(r[2])) \
+                .groupby("tau", as_index=False).mean() \
+                .sort_values(by="tau")
+            last = G_tau_0.query("tau==0")
+            last.tau = b
+            G_tau_0 = G_tau_0.append(last, ignore_index=True)
+            G_tau_0.value = G_tau_0.value.apply(lambda x: -x)
+            P_l = np.polynomial.legendre.legfit(G_tau_0.tau, G_tau_0.value, self.__L - 1)
+            G = np.polynomial.legendre.Legendre(P_l)
+            Gl = np.ndarray(shape=(self.__L), dtype=float)
+            Gerror = np.ndarray(shape=(self.__L), dtype=float)
+            for l in range(0, self.__L):
+                I = integrate.quad(lambda tau: special.eval_legendre(l, 2.0 * tau / float(b) - 1.0) * G(tau), \
+                                   0.0, float(b))
+                Gl[l] = np.sqrt(2.0 * l + 1.0) * I[0]
+                Gerror[l] = I[1]
+            N = self.__N + 1
+            T_nl = np.ndarray(shape=(N, self.__L), dtype=complex)
+            for n in range(0, N):
+                for l in range(0, self.__L):
+                    T_nl[n][l] = (-1)**n * 1.0j**(l + 1) * (2.0 * l + 1)**(0.5) * \
+                                 special.spherical_jn(l, (2.0 * n + 1.0) * np.pi * 0.5)
+            Giw = T_nl.dot(Gl)
+            df = pd.DataFrame({"w_n": [np.pi / float(b) * (2 * n + 1.) for n in range(0, N)], \
+                               "orb1": np.full(N, G_tau_0.orb1.values[0]),\
+                               "orb2": np.full(N, G_tau_0.orb2.values[0]),\
+                               "rx": np.full(N, r[0]),\
+                               "ry": np.full(N, r[1]),\
+                               "rz": np.full(N, r[2]),\
+                               "dist": np.full(N, G_tau_0.dist.values[0]),\
+                               "value": [-np.real(g) + 1.0j*np.imag(g) for g in Giw],\
+                               "error" : np.full(N, 0.0)})
+            if not "TDM/Giw" in frame:
+                frame["TDM/Giw"] = df
+            else:
+                frame["TDM/Giw"] = pd.concat([frame["TDM/Giw"], df])
+        return frame
+
+    def extract(self, keys):
         frames = None
         for root, dirs, files in  os.walk(self.__projdir):
             for f in files:
@@ -354,14 +414,16 @@ class Extractor:
                     strParams = simParams.query("type == 'str'")
                     strParams = strParams.drop(['type'], axis=1)
                     simFrames["PARAM/String"] = strParams
+                    if self.__matsubara:
+                        simFrames = self.calcGiw(simFrames)
                     keyValues = []
                     for key in keys:
                         row = simParams[simParams.name == key]
-                        type = str(row.type).split()[1]
+                        type = str(row.type.values[0])
                         if type == "float":
-                            keyValues.append(float(row.value))
+                            keyValues.append(float(row.value.values[0]))
                         elif type == "list":
-                            keyValues.append(float(row.value[0][0]))
+                            keyValues.append(float(row.value.values[0][0]))
                     initFrames = not frames
                     if initFrames:
                         frames = {}
@@ -374,18 +436,25 @@ class Extractor:
                             frames[k] = pd.concat([frames[k], frame])
         return frames
 
-parser = optparse.OptionParser(usage = "%prog [keys] [options]")
-parser.add_option("--output", "-o", type = "string", metavar = "FILE", dest = "output", help = "The name of the output file")
-parser.add_option("--proj-dir", "-p", type = "string", metavar = "FILE", dest = "projdir",\
-                  help = "The root directory from which %prog should start looking recursively")
+parser = optparse.OptionParser(usage="%prog [keys] [options]")
+parser.add_option("--output", "-o", type="string", metavar="FILE", dest="output", help="The name of the output file")
+parser.add_option("--proj-dir", "-p", type="string", metavar="DIR", dest="projdir",\
+                  help="The root directory from which %prog should start looking recursively")
+matsubaraGroup = optparse.OptionGroup(parser, "Matsubara Options")
+matsubaraGroup.add_option("--matsubara", "-m", action="store_true", dest="matsubara", help="")
+matsubaraGroup.add_option("--l-max", "-l", type="int", dest="lmax", metavar="NUM", default=100, help="")
+matsubaraGroup.add_option("--n-frequencies", "-n", type="int", dest="nfreq", metavar="NUM", default=2000, help="")
+parser.add_option_group(matsubaraGroup)
 
 (options, args) = parser.parse_args()
 
-
 ext = Extractor()
+ext.calcMatsubara(options.matsubara)
+ext.setNumFrequencies(options.nfreq)
+ext.setNumLegendre(options.lmax)
 if options.projdir:
     ext.setProjectDir(os.path.abspath(options.projdir))
-frames = ext.extract("beta", "U")
+frames = ext.extract(args)
 hdf = HDFStore(options.output if options.output  else "output.hdf5")
 for k, frame in frames.iteritems():
     if k != "Parameters":
