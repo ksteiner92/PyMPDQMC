@@ -68,8 +68,8 @@ module DQMC_TDM1
                   "Den-Den     ", &
                   "S-wave      ", &
                   "Conductivity", &
-                  "GfunSelf up", &
-                  "GfunSelf dn"/)
+                  "GfunSelf up ", &
+                  "GfunSelf dn "/)
 
   type TDM1
      integer  :: L
@@ -290,22 +290,19 @@ contains
           allocate(T1%properties(iprop)%valuesk(nk*npp,0:T1%L-1,T1%err))
 
        case(IFSUP, IFSDN)
-          !nclass = S%nClass**3
 
+          T1%properties(iprop)%tlink  => Gwrap%Hamilt%Uv
           T1%properties(iprop)%n      =  S%nSite
-          T1%properties(iprop)%nclass =  S%nSite**3
+          T1%properties(iprop)%nclass =  S%nClass
           T1%properties(iprop)%D      => S%D
-          allocate(T1%properties(iprop)%F(S%nSite**3))
-          T1%properties(iprop)%F = 1
-          T1%properties(iprop)%nk     =  S%nclass
+          T1%properties(iprop)%F      => S%F
+          T1%properties(iprop)%nk     =  Gwrap%GammaLattice%nclass_k
           T1%properties(iprop)%np     =  Gwrap%lattice%natom
           nullify(T1%properties(iprop)%ftk)
-          !Reuse tlink for storing the hubbard U's
-          T1%properties(iprop)%tlink  => Gwrap%Hamilt%Uv
           T1%properties(iprop)%ftw    => T1%ftwbos
           T1%properties(iprop)%phase  => S%chi_phase
           T1%properties(iprop)%clabel  => S%clabel
-          allocate(T1%properties(iprop)%values(S%nSite**3,0:T1%L-1,T1%err))
+          allocate(T1%properties(iprop)%values(S%nClass,0:T1%L-1,T1%err))
           nullify(T1%properties(iprop)%valuesk)
 
        case(ICOND)
@@ -660,13 +657,13 @@ contains
 
     ! ... Local scalar ...
 
-    integer  :: nclass, i, j, a, b, k, dt, dt1, dt2, iprop
+    integer  :: nclass, i, j, a, b, k, dt, dt1, dt2, iprop, dij
     real(wp), pointer :: value1(:)
     real(wp), pointer :: value2(:)
     real(wp) :: factor
 
     integer :: nsite, ic, jc, l1s, l1e, l2s, l2e
-    real(wp) :: tl1up2up, tl1dn2dn, tl1up2dn, tl1dn2up, dxl1, dxl2, dxl1l2
+    real(wp) :: tl1up2up, tl1dn2dn, tl1up2dn, tl1dn2up, dxl1, dxl2, dxl1l2, Fabjt0
     integer  :: dims(3), indices(3)
     type(IndexList), pointer :: next
 
@@ -767,41 +764,35 @@ contains
                                         + dn0t(j,i)*up0t(j,i)
                             end if
                         case (IFSUP)
-                            indices(1) = i
-                            indices(2) = j
-                            dims(1:3) = T1%properties(IFSUP)%n
-                            do a = 1,  T1%properties(IFSUP)%n
-                                indices(3) = a
-                                b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-                                write(*,*) i, j, a, b
-                                if (dt .ne. 0) then
-                                    value1(b)  = value1(b) + 0.5_wp * &
-                                            (-upt0(i,j) * (1.0_wp - up00(a,a)))
-                                    !        (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
-                                    value2(b)  = value2(b) + 0.5_wp * &
-                                            (-up0t(i,j) * (1.0_wp - uptt(a,a)))
-                                    !        (up0t(i,j) * uptt(a,a) - up0t(i,a) * uptt(a,j))
-                                else
-                                    value1(b)  = value1(b) + (-upt0(i,j) * (1.0_wp - up00(a,a)))
-                                    !value1(b)  = value1(b) + (upt0(i,j) * up00(a,a) - upt0(i,a) * up00(a,j))
-                                end if
-                            end do
+                            if (i .eq. j) then
+                                dij = 1
+                            else
+                                dij = 0
+                            end if
+                            if (dt .ne. 0) then
+                                value1(k)  = value1(k) - T1%properties(IFSUP)%tlink(0,0)**2 * ((1.0 - dntt(i,i)) * upt0(i,j) * (1.0 - dn00(j,j)) + &
+                                        (dij - dn0t(j,i)) * dnt0(i,j) * upt0(i,j)) * 0.5
+                                value2(k)  = value2(k) - T1%properties(IFSUP)%tlink(0,0)**2 * ((1.0 - dntt(j,j)) * upt0(j,i) * (1.0 - dn00(i,i)) + &
+                                        (dij - dn0t(i,j)) * dnt0(j,i) * upt0(j,i)) * 0.5
+                            else
+                                value1(k)  = value1(k) - T1%properties(IFSUP)%tlink(0,0)**2 * (1.0 - dntt(i,i)) * upt0(i,j) * (1.0 - dn00(j,j)) + &
+                                        (dij - dn0t(j,i)) * dnt0(i,j) * upt0(i,j)
+                            end if
                         case (IFSDN)
-                            indices(1) = i
-                            indices(2) = j
-                            dims(1:3) = T1%properties(IFSUP)%n
-                            do a = 1,  T1%properties(IFSDN)%n
-                                indices(3) = a
-                                b = DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3)
-                                if (dt .ne. 0) then
-                                    value1(b)  = value1(b) + 0.5_wp * &
-                                            (dnt0(i,j) * dn00(a,a) - dnt0(i,a) * dn00(a,j))
-                                    value2(b)  = value2(b) + 0.5_wp * &
-                                            (dn0t(i,j) * dntt(a,a) - dn0t(i,a) * dntt(a,j))
-                                else
-                                    value1(b)  = value1(b) + (dnt0(i,j) * dn00(a,a) - dnt0(i,a) * dn00(a,j))
-                                end if
-                            end do
+                            if (i .eq. j) then
+                                dij = 1
+                            else
+                                dij = 0
+                            end if
+                            if (dt .ne. 0) then
+                                value1(k)  = value1(k) - T1%properties(IFSUP)%tlink(0,0)**2 * ((1.0 - uptt(i,i)) * dnt0(i,j) * (1.0 - up00(j,j)) + &
+                                        (dij - up0t(j,i)) * upt0(i,j) * dnt0(i,j)) * 0.5
+                                value2(k)  = value2(k) - T1%properties(IFSUP)%tlink(0,0)**2 * ((1.0 - uptt(j,j)) * dnt0(j,i) * (1.0 - up00(i,i)) + &
+                                        (dij - up0t(i,j)) * upt0(j,i) * dnt0(j,i)) * 0.5
+                            else
+                                value1(k)  = value1(k) - T1%properties(IFSUP)%tlink(0,0)**2 * (1.0 - uptt(i,i)) * dnt0(i,j) * (1.0 - up00(j,j)) + &
+                                        (dij - up0t(j,i)) * upt0(i,j) * dnt0(i,j)
+                            end if
                 end select
                 if (.not. associated(next%next)) then
                     exit
@@ -1116,7 +1107,7 @@ contains
     enddo
 
     do iprop = 1, NTDMARRAY
-       if (iprop .eq. IFSUP .or. iprop .eq. IFSDN) cycle
+       !if (iprop .eq. IFSUP .or. iprop .eq. IFSDN) cycle
        do i = 1, T1%properties(iprop)%nclass
           do j = 0, T1%L-1
              tmp(j+1, 1:2) = T1%properties(iprop)%values(i, j, T1%avg:T1%err)
@@ -1330,31 +1321,53 @@ contains
     !allocate(ipiv(n))
     !allocate(G(n,n))
     !allocate(GS(n,n))
-    allocate(S(0:L-1, nclass))
+    !allocate(S(0:L-1, nclass))
 
-    dims(1:3) = nclass
+    !dims(1:3) = n
 
-    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(a, b, i, j, ab, indices)
-    do t = 0, L - 1
-        write(label(t + 1),'(f15.8)') t * T1%dtau
-        S(t,:) = 0.0
-        do a = 1, n
-            do b = 1, n
-                indices(2) = b
-                ab = T1%properties(IFSUP)%D(a,b)
-                do i = 1, n
-                    indices(1) = i
-                    do j = 1, n
-                        indices(3) = j
-                        S(t,ab) = S(t,ab) + 0.5_wp * (T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
-                                T1%properties(IFSUP)%values(DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3), t, T1%avg) / &
-                                T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(a,i), t, T1%avg)
-                    end do
-                end do
-            end do
-        end do
-    end do
-    !$OMP END PARALLEL DO
+!    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(a, b, i, j, ab, indices)
+!    do t = 0, L - 1
+!        write(label(t + 1),'(f15.8)') t * T1%dtau
+!        S(t,:) = 0.0
+!        do a = 1, n
+!            do b = 1, n
+!                indices(2) = b
+!                ab = T1%properties(IFSUP)%D(a,b)
+!                do i = 1, n
+!                    indices(1) = i
+!                    do j = 1, n
+!                        indices(3) = j
+!                        S(t,ab) = S(t,ab) + 0.5_wp * (T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+!                                T1%properties(IFSUP)%values(DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3), t, T1%avg) / &
+!                                T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(a,i), t, T1%avg)
+!                    end do
+!                end do
+!            end do
+!        end do
+!    end do
+!    !$OMP END PARALLEL DO
+
+!    !$OMP PARALLEL DO SCHEDULE(STATIC), PRIVATE(a, b, i, j, ab, indices)
+!    do t = 0, L - 1
+!        write(label(t + 1),'(f15.8)') t * T1%dtau
+!        S(t,:) = 0.0
+!        do a = 1, n
+!            do b = 1, n
+!                indices(2) = b
+!                ab = T1%properties(IFSUP)%D(a,b)
+!                do i = 1, n
+!                    indices(1) = i
+!                    do j = 1, n
+!                        indices(3) = j
+!                        S(t,ab) = S(t,ab) + 0.5_wp * (T1%properties(IFSUP)%tlink(j,b) + T1%properties(IFSUP)%tlink(b,j)) * &
+!                                T1%properties(IFSUP)%values(DQMC_TDM1_GetUniqueIndexOfTuple(indices, dims, 3), t, T1%avg) / &
+!                                T1%properties(IGFUP)%values(T1%properties(IGFUP)%D(a,i), t, T1%avg)
+!                    end do
+!                end do
+!            end do
+!        end do
+!    end do
+!    !$OMP END PARALLEL DO
 
     !do t = 0, L - 1
     !   write(label(t + 1),'(f15.8)') t * T1%dtau
