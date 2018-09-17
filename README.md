@@ -1,10 +1,7 @@
 # PyMPDQMC
 
 A python module for wrapping the example 'ggeom' executable of the quest DQMC (Determinant Quantum Monte Carlo) simulator.
-It allows to run different temperature calculations in parallel by automatically submitting it through an sbatch script on a cluster.
-Before the actual simulation a a pre-processing can be performed and input parameters can be changed on the fly.
-The current supported pre-processing is calculating the chemical potential for a given filling. This is relevant for
-non particle hole symmetric systems.
+It allows to run different temperature calculations in parallel by automatically submitting it through an sbatch script on a cluster. Before the actual simulation is executed, a pre-processing can be performed, and also input parameters can be changed on the fly. The current implemented pre-processing is "calcmu", which calculates the chemical potential for a given filling. This is relevant for non particle hole symmetric systems.
 
 ## Usage
 
